@@ -15,8 +15,6 @@ import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Structure;
 
-import featurecreep.attach.AttachLinux.CLib.SockAddrUn;
-
 public class AttachLinux extends AttachUnix {
     private static String socket_path;
     private static final int ATTACH_ERROR_BADVERSION = 101;
@@ -104,17 +102,17 @@ public class AttachLinux extends AttachUnix {
     private static final int EINTR  = 4;
 
     private static int socket() throws IOException {
-        int fd = CLib.INSTANCE.socket(CLib.AF_UNIX, CLib.SOCK_STREAM, 0);
+        int fd = CLibAttachLinux.INSTANCE.socket(CLibAttachLinux.AF_UNIX, CLibAttachLinux.SOCK_STREAM, 0);
         if (fd == -1) {
-            throw new IOException("socket: " + CLib.INSTANCE.strerror(Native.getLastError()));
+            throw new IOException("socket: " + CLibAttachLinux.INSTANCE.strerror(Native.getLastError()));
         }
         return fd;
     }
 
     private static void connect(int fd, String path) throws IOException {
         // Build struct sockaddr_un exactly as the C code does
-        CLib.SockAddrUn addr = new CLib.SockAddrUn();
-        addr.sun_family = CLib.AF_UNIX;
+        CLibAttachLinux.SockAddrUnAttachLinux addr = new CLibAttachLinux.SockAddrUnAttachLinux();
+        addr.sun_family = CLibAttachLinux.AF_UNIX;
         byte[] bytes = path.getBytes(StandardCharsets.UTF_8);
         if (bytes.length >= addr.sun_path.length) {
             throw new IOException("UNIX domain path too long");
@@ -123,41 +121,41 @@ public class AttachLinux extends AttachUnix {
         addr.sun_path[bytes.length] = 0;          // NUL‑terminate
         addr.write();                             // copy to native memory
 
-        int res = CLib.INSTANCE.connect(fd, addr, addr.size());
+        int res = CLibAttachLinux.INSTANCE.connect(fd, addr, addr.size());
         if (res == -1) {
             int err = Native.getLastError();
             if (err == ENOENT) {
                 throw new FileNotFoundException("socket file not found: " + path);
             }
-            throw new IOException("connect: " + CLib.INSTANCE.strerror(err));
+            throw new IOException("connect: " + CLibAttachLinux.INSTANCE.strerror(err));
         }
     }
 
     private static void close(int fd) throws IOException {
-        CLib.INSTANCE.shutdown(fd, CLib.SHUT_RDWR);
+        CLibAttachLinux.INSTANCE.shutdown(fd, CLibAttachLinux.SHUT_RDWR);
         int res;
         do {
-            res = CLib.INSTANCE.close(fd);
+            res = CLibAttachLinux.INSTANCE.close(fd);
         } while (res == -1 && Native.getLastError() == EINTR);
         if (res == -1) {
-            throw new IOException("close: " + CLib.INSTANCE.strerror(Native.getLastError()));
+            throw new IOException("close: " + CLibAttachLinux.INSTANCE.strerror(Native.getLastError()));
         }
     }
 
     private static void sendQuitTo(int pid) throws IOException {
-        if (CLib.INSTANCE.kill(pid, CLib.SIGQUIT) == -1) {
-            throw new IOException("kill: " + CLib.INSTANCE.strerror(Native.getLastError()));
+        if (CLibAttachLinux.INSTANCE.kill(pid, CLibAttachLinux.SIGQUIT) == -1) {
+            throw new IOException("kill: " + CLibAttachLinux.INSTANCE.strerror(Native.getLastError()));
         }
     }
 
     private static void checkPermissions(String path) throws IOException {
-        CLib.Stat64 st = new CLib.Stat64();
-        if (CLib.INSTANCE.stat64(path, st) != 0) {
-            throw new IOException("stat64: " + CLib.INSTANCE.strerror(Native.getLastError()));
+        CLibAttachLinux.Stat64AttachLinux st = new CLibAttachLinux.Stat64AttachLinux();
+        if (CLibAttachLinux.INSTANCE.stat64(path, st) != 0) {
+            throw new IOException("stat64: " + CLibAttachLinux.INSTANCE.strerror(Native.getLastError()));
         }
 
-        int uid = CLib.INSTANCE.geteuid();
-        int gid = CLib.INSTANCE.getegid();
+        int uid = CLibAttachLinux.INSTANCE.geteuid();
+        int gid = CLibAttachLinux.INSTANCE.getegid();
 
         if (st.st_uid != uid && uid != 0) {
             throw new IOException("file owner mismatch (uid " + st.st_uid + ')');
@@ -165,7 +163,7 @@ public class AttachLinux extends AttachUnix {
         if (st.st_gid != gid && uid != 0) {
             throw new IOException("file group mismatch (gid " + st.st_gid + ')');
         }
-        int bad = (st.st_mode & (CLib.S_IRWXG | CLib.S_IRWXO));
+        int bad = (st.st_mode & (CLibAttachLinux.S_IRWXG | CLibAttachLinux.S_IRWXO));
         if (bad != 0) {
             throw new IOException(String.format("file permissions 0%03o too permissive", st.st_mode & 0777));
         }
@@ -178,11 +176,11 @@ public class AttachLinux extends AttachUnix {
 
         int n;
         do {
-            n = CLib.INSTANCE.read(fd, scratch, todo);
+            n = CLibAttachLinux.INSTANCE.read(fd, scratch, todo);
         } while (n == -1 && Native.getLastError() == EINTR);
 
         if (n == -1) {
-            throw new IOException("read: " + CLib.INSTANCE.strerror(Native.getLastError()));
+            throw new IOException("read: " + CLibAttachLinux.INSTANCE.strerror(Native.getLastError()));
         }
         if (n == 0) {                      // EOF
             return -1;
@@ -202,11 +200,11 @@ public class AttachLinux extends AttachUnix {
 
             int n;
             do {
-                n = CLib.INSTANCE.write(fd, buf, chunk);
+                n = CLibAttachLinux.INSTANCE.write(fd, buf, chunk);
             } while (n == -1 && Native.getLastError() == EINTR);
 
             if (n <= 0) {   
-                throw new IOException("write: " + CLib.INSTANCE.strerror(Native.getLastError()));
+                throw new IOException("write: " + CLibAttachLinux.INSTANCE.strerror(Native.getLastError()));
             }
             off       += n;
             remaining -= n;
@@ -288,7 +286,7 @@ public class AttachLinux extends AttachUnix {
                 }
             }
             
-            CLib.INSTANCE.shutdown(s, CLib.SHUT_WR);
+            CLibAttachLinux.INSTANCE.shutdown(s, CLibAttachLinux.SHUT_WR);
             
         } catch (IOException x) {
             ioe = x;
@@ -587,10 +585,10 @@ public class AttachLinux extends AttachUnix {
 
 
 
-    interface CLib extends Library {
+    interface CLibAttachLinux extends Library {
         int SHUT_WR = 1;
 
-		CLib INSTANCE = Native.load("c", CLib.class);
+		CLibAttachLinux INSTANCE = Native.load("c", CLibAttachLinux.class);
 
         int AF_UNIX = 1;
         int SOCK_STREAM = 1;
@@ -605,19 +603,19 @@ public class AttachLinux extends AttachUnix {
         int socket(int afUnix, int sockStream, int i);
 		int  read (int fd, byte[] buffer, int count);
 
-        int connect(int fd, SockAddrUn addr, int addrlen);
+        int connect(int fd, SockAddrUnAttachLinux addr, int addrlen);
         int close(int fd);
         int shutdown(int fd, int how);
         int kill(int pid, int sig);
         String strerror(int err);
-        int stat64(String path, Stat64 st);
+        int stat64(String path, Stat64AttachLinux st);
         int geteuid();
         int getegid();
 
         @Structure.FieldOrder({"st_dev", "st_ino", "st_nlink", "st_mode", "st_uid", "st_gid", 
                               "st_rdev", "st_size", "st_blksize", "st_blocks", "st_atime", 
                               "st_mtime", "st_ctime"})
-        class Stat64 extends Structure {
+        class Stat64AttachLinux extends Structure {
             public long st_dev;
             public long st_ino;
             public long st_nlink;
@@ -634,7 +632,7 @@ public class AttachLinux extends AttachUnix {
         }
 
         @Structure.FieldOrder({"sun_family", "sun_path"})
-        class SockAddrUn extends Structure {
+        class SockAddrUnAttachLinux extends Structure {
             public short sun_family = AF_UNIX;
             public byte[] sun_path = new byte[108];
 
