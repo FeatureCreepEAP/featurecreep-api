@@ -92,7 +92,7 @@ public class BasicIO {
     /**
      * Converts a String to a byte-array using UTF-8 encoding.
      *
-     * @param bytes The String to convert.
+     * @param str The String to convert.
      * @return The converted byte[].
      */
     public static byte[] stringToByteArray(String str) {

@@ -12,7 +12,7 @@ public class GoogleCommonsImmutableMutaliser {
      * Adds an object to a GoogleCommons RegularImmutableMap
      * @param key The key for the new entry
      * @param to_add The value for the new entry
-     * @param list The list representing the ImmutableMap
+     * @param map The list representing the ImmutableMap
      */
     public static void addToRegularImmutableMap(Object key, Object to_add, Map map) {
         try {

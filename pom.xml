@@ -2,9 +2,142 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.asbestosstar</groupId>
   <artifactId>featurecreep-api</artifactId>
-  <version>4.0pre19</version>
+  <version>4.0pre19am0</version>
   <name>FeatureCreep API</name>
   <description>Java General Purpose API providing stuff for remapping, parsing, bytecode manipulation, and other capabilities</description>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<url>https://pagure.io/featurecreep/featurecreep-api</url>
+
+	<licenses>
+		<license>
+			<name>The Unlicense</name>
+			<url>https://unlicense.org/</url>
+		</license>
+	</licenses>
+
+	<developers>
+		<developer>
+			<name>Asbestosstar</name>
+			<email>asbestosstar@asbestosstar.com</email>
+			<organization>Asbestosstar</organization>
+			<organizationUrl>https://asbestosstar.com</organizationUrl>
+		</developer>
+	</developers>
+
+	<scm>
+		<connection>
+			scm:git:https://pagure.io/featurecreep/featurecreep-api.git</connection>
+		<developerConnection>
+			scm:git:ssh://git@pagure.io/featurecreep/featurecreep-api.git</developerConnection>
+		<url>https://pagure.io/featurecreep/featurecreep-api</url>
+	</scm>
+
+	<!-- Distribution Management -->
+	<distributionManagement>
+		<snapshotRepository>
+			<id>central</id>
+			<url>https://central.sonatype.org/</url>
+		</snapshotRepository>
+		<repository>
+			<id>central</id>
+			<url>
+				https://central.sonatype.org/</url>
+		</repository>
+	</distributionManagement>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.8.1</version> <!-- 使用合适的版本 -->
+				<configuration>
+					<source>1.8</source>
+					<target>1.8</target>
+				</configuration>
+			</plugin>
+
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-source-plugin</artifactId>
+				<version>3.2.1</version>
+				<executions>
+					<execution>
+						<id>attach-sources</id>
+						<goals>
+							<goal>jar-no-fork</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Maven Javadoc Plugin -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>3.4.0</version>
+				<executions>
+					<execution>
+						<id>attach-javadocs</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Maven GPG Plugin -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-gpg-plugin</artifactId>
+				<version>3.0.1</version>
+				<executions>
+					<execution>
+						<id>sign-artifacts</id>
+						<phase>package</phase>
+						<goals>
+							<goal>sign</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Nexus Staging Maven Plugin -->
+			<plugin>
+				<groupId>org.sonatype.central</groupId>
+				<artifactId>central-publishing-maven-plugin</artifactId>
+				<version>0.7.0</version>
+				<extensions>true</extensions>
+				<configuration>
+					<publishingServerId>central</publishingServerId>
+					<autoPublish>true</autoPublish>
+				</configuration>
+			</plugin>
+
+
+
+
+		</plugins>
+	</build>
+
+
+
+
 
 
 
@@ -162,9 +295,19 @@
 <dependency>
     <groupId>net.java.dev.jna</groupId>
     <artifactId>jna</artifactId>
-    <version>5.13.0</version>
+    <version>5.18.1</version>
     <scope>provided</scope>
 </dependency>
+
+
+
+<!-- https://mvnrepository.com/artifact/net.java.dev.jna/jna-platform -->
+<dependency>
+    <groupId>net.java.dev.jna</groupId>
+    <artifactId>jna-platform</artifactId>
+    <version>5.18.1</version>
+</dependency>
+
  	
    </dependencies>
 
