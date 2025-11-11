@@ -152,6 +152,16 @@
     <name>Kenzie's Repository</name>
     <url>https://repo.kenzie.mx/releases</url>
 </repository>
+
+	
+		<repository>
+    <id>cursedmaven</id>
+    <name>cursedmaven</name>
+    <url>https://cursemaven.com</url>
+</repository>
+
+
+
 	</repositories>
 
 
@@ -308,8 +318,22 @@
     <version>5.18.1</version>
 </dependency>
 
+<dependency>
+    <groupId>curse.maven</groupId>
+    <artifactId>crashdetector-1224146</artifactId>
+    <version>7081171</version>
+</dependency>
+
+
+
+
+
+
+
+
  	
    </dependencies>
+
 
 
 </project>
