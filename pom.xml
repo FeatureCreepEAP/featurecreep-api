@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.asbestosstar</groupId>
   <artifactId>featurecreep-api</artifactId>
-  <version>5am2</version>
+  <version>5am3</version>
   <name>FeatureCreep API</name>
   <description>Java General Purpose API providing stuff for remapping, parsing, bytecode manipulation, and other capabilities</description>
 
@@ -298,6 +298,13 @@
     <groupId>mx.kenzie</groupId>
     <artifactId>mimic</artifactId>
     <version>1.1.0</version><!-- ES DEPRECADO, Solo es la version para Java 16 porque el version para Java 8 no funcion bueno, es una version viaje porque la versio nueva no funciona con Mirror-->
+</dependency>
+
+<!-- https://mvnrepository.com/artifact/org.jboss/jboss-dmr -->
+<dependency>
+    <groupId>org.jboss</groupId>
+    <artifactId>jboss-dmr</artifactId>
+    <version>1.7.0.Final</version>
 </dependency>
 
 
