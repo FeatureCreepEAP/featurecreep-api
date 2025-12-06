@@ -29,12 +29,13 @@ public interface AppError {
 	/**
 	 * Register your errors here.
 	 * @param error
-	 * @param dyanmic This option is for Crash Detector if your class is made dynamically, or is in a nested jar, or is relying on info in the game classes and needs to be serialised (true) or if it is just a static log analysis with a physical class file not in a nested jar¡.
+	 * @param dynamic This option is for Crash Detector if your class is made dynamically, or is in a nested jar, or is relying on info in the game classes and needs to be serialised (true) or if it is just a static log analysis with a physical class file not in a nested jar¡.
 	 */
 	public static void registerError(AppError error, boolean dynamic) {
 		errors.add(error);
 		if (AppError.classExists("com.asbestosstar.crashdetector.analizador.Verificaciones")){
 			CrashDetectorError cd = new CrashDetectorError(error);
+			CrashDetectorError.register(cd, dynamic);
 		}
 		
 		
