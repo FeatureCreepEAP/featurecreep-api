@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.asbestosstar</groupId>
   <artifactId>featurecreep-api</artifactId>
-  <version>5am3</version>
+  <version>5am4</version>
   <name>FeatureCreep API</name>
   <description>Java General Purpose API providing stuff for remapping, parsing, bytecode manipulation, and other capabilities</description>
 
@@ -313,7 +313,6 @@
     <groupId>net.java.dev.jna</groupId>
     <artifactId>jna</artifactId>
     <version>5.18.1</version>
-    <scope>provided</scope>
 </dependency>
 
 
@@ -323,7 +322,6 @@
     <groupId>net.java.dev.jna</groupId>
     <artifactId>jna-platform</artifactId>
     <version>5.18.1</version>
-    <scope>provided</scope>
 </dependency>
 
 <dependency>
