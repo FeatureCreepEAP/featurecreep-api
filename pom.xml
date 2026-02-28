@@ -1,8 +1,8 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="https://maven.apache.org/POM/4.0.0" xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.asbestosstar</groupId>
   <artifactId>featurecreep-api</artifactId>
-  <version>5am4</version>
+  <version>6.0.0-am3</version>
   <name>FeatureCreep API</name>
   <description>Java General Purpose API providing stuff for remapping, parsing, bytecode manipulation, and other capabilities</description>
 
@@ -170,70 +170,12 @@
 
    <dependencies>
 
- 	<dependency>
- 		<groupId>org.javassist</groupId>
- 		<artifactId>javassist</artifactId>
- 		<version>3.30.2-GA</version>
- 	</dependency>
+ 	
 
-
-<dependency>
-    <groupId>org.jboss.logging</groupId>
-    <artifactId>jboss-logging</artifactId>
-    <version>3.5.3.Final</version><!-- Version final para java 8-->
-</dependency>
- 	
- 	
-<!-- https://mvnrepository.com/artifact/org.jboss.logmanager/jboss-logmanager -->
-<dependency>
-    <groupId>org.jboss.logmanager</groupId>
-    <artifactId>jboss-logmanager</artifactId>
-    <version>2.1.18.Final</version><!-- Version final para java 8, as una version menos y usa wildfly common pero es mas estabal-->
-</dependency>
- 	
- 	
- 	
- 	<!-- https://mvnrepository.com/artifact/io.smallrye.common/smallrye-common-constraint -->
-<dependency>
-    <groupId>io.smallrye.common</groupId>
-    <artifactId>smallrye-common-constraint</artifactId>
-    <version>1.13.2</version><!-- Version final para java 8-->
-</dependency>
- 	
- 	 	<!-- https://mvnrepository.com/artifact/io.smallrye.common/smallrye-common-constraint -->
-<dependency>
-    <groupId>io.smallrye.common</groupId>
-    <artifactId>smallrye-common-net</artifactId>
-    <version>1.13.2</version><!-- Version final para java 8-->
-</dependency>
- 	
- 	
- 	 	 	<!-- https://mvnrepository.com/artifact/io.smallrye.common/smallrye-common-constraint -->
-<dependency>
-    <groupId>io.smallrye.common</groupId>
-    <artifactId>smallrye-common-os</artifactId>
-    <version>1.13.2</version><!-- Version final para java 8-->
-</dependency>
  	
  	
  	
  	
- 	 	 	 	<!-- https://mvnrepository.com/artifact/io.smallrye.common/smallrye-common-constraint -->
-<dependency>
-    <groupId>io.smallrye.common</groupId>
-    <artifactId>smallrye-common-ref</artifactId>
-    <version>1.13.2</version><!-- Version final para java 8-->
-</dependency>
- 	
- 	
- 	 	 	 	 	<!-- https://mvnrepository.com/artifact/io.smallrye.common/smallrye-common-constraint -->
-<dependency>
-    <groupId>io.smallrye.common</groupId>
-    <artifactId>smallrye-common-cpu</artifactId>
-    <version>1.13.2</version><!-- Version final para java 8-->
-</dependency>
-
- 	 	 	 	 	<!-- https://mvnrepository.com/artifact/io.smallrye.common/smallrye-common-constraint -->
 <dependency>
     <groupId>com.asbestosstar</groupId>
     <artifactId>featurecreep-loader</artifactId>
@@ -242,70 +184,14 @@
  	
  	
  	
+ 
+
+
+
  	
- 	
- 	<!-- https://mvnrepository.com/artifact/ar.com.hjg/pngj -->
-<dependency>
-    <groupId>ar.com.hjg</groupId>
-    <artifactId>pngj</artifactId>
-    <version>2.1.0</version>
-</dependency>
 
-
-
-	<dependency>
-	    <groupId>com.github.vincentzhang96</groupId><!-- Usa Jitpack porque el repo oficial no mas existe -->
-	    <artifactId>DDS4J</artifactId>
-	    <version>v1.0.2</version>
-	</dependency>
-
-
- 	<!-- TODO AssistMixer -->
-
- 	<dependency>
-	    <groupId>com.asbestosstar</groupId>
-	    <artifactId>assistremapper</artifactId>
-	    <version>1.1</version>
-	</dependency>
- 	
- 	 <dependency>
-	    <groupId>com.asbestosstar</groupId>
-	    <artifactId>shadowassist</artifactId>
-	    <version>0.0.1</version>
-	</dependency>
- 	
- 	<dependency>
-	    <groupId>com.asbestosstar</groupId>
-	    <artifactId>dnf-java</artifactId>
-	    <version>0.0.1</version>
-	</dependency>
 	
-	 <dependency>
-	    <groupId>com.asbestosstar</groupId>
-	    <artifactId>structurelib</artifactId>
-	    <version>0.0.1</version>
-	</dependency>
-	
-	
-	<dependency>
-    <groupId>mx.kenzie</groupId>
-    <artifactId>mirror</artifactId>
-    <version>5.0.3</version><!-- ES DEPRECADO, Solo es la version para Java 16 porque el version para Java 8 no funcion bueno-->
-</dependency>
 
-
-<dependency>
-    <groupId>mx.kenzie</groupId>
-    <artifactId>mimic</artifactId>
-    <version>1.1.0</version><!-- ES DEPRECADO, Solo es la version para Java 16 porque el version para Java 8 no funcion bueno, es una version viaje porque la versio nueva no funciona con Mirror-->
-</dependency>
-
-<!-- https://mvnrepository.com/artifact/org.jboss/jboss-dmr -->
-<dependency>
-    <groupId>org.jboss</groupId>
-    <artifactId>jboss-dmr</artifactId>
-    <version>1.7.0.Final</version>
-</dependency>
 
 
 

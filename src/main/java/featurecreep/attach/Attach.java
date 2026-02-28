@@ -1,6 +1,6 @@
 package featurecreep.attach;
 
-import io.smallrye.common.os.OS;
+import featurecreep.api.lowlevel.OS;
 
 /**
  * This is a reimplementation of Suns Attach mechanism which does not require a
@@ -35,11 +35,11 @@ public class Attach {
 				AttachSolaris.loadAgent(agent, "testargs");
 			} else if (OS.current().equals(OS.MAC) || OS.current().name().toLowerCase().contains("bsd")) {
 
-				BSDAttach bsd = new BSDAttach(String.valueOf(io.smallrye.common.os.Process.getProcessId()));
+				BSDAttach bsd = new BSDAttach(String.valueOf(ProcessHandle.current().pid()));
 				System.out.println("loading agent");
 				bsd.loadAgent(agent, "testargs");
 			}else if (OS.current().equals(OS.WINDOWS)) {//Possibly OS/2 or Arca, though that could be a UNIX?
-	            AttachWindows vm = new AttachWindows((int)io.smallrye.common.os.Process.getProcessId());
+	            AttachWindows vm = new AttachWindows((int)ProcessHandle.current().pid());
 				System.out.println("loading agent");
 				 vm.loadAgent(agent, null);
 			}

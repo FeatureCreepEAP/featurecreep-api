@@ -7,61 +7,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-import com.sun.jna.Library;
 import com.sun.jna.Native;
-import com.sun.jna.Pointer;
-import com.sun.jna.Structure;
-import com.sun.jna.ptr.IntByReference;
 
-// JNA library interface
-interface CLibraryAttachBSD extends Library {
-	
-	
-	
-	CLibraryAttachBSD INSTANCE = (CLibraryAttachBSD) Native.loadLibrary("c", CLibraryAttachBSD.class);
+import featurecreep.attach.bsd.CLibraryAttachBSD;
+import featurecreep.attach.bsd.NativeConstantsAttachBSD;
+import featurecreep.attach.bsd.SockaddrUnAttachBSD;
 
-	// Add missing functions
-	int geteuid();
 
-	int getegid();
-
-	// Socket functions
-	int socket(int domain, int type, int protocol);
-
-	int connect(int sockfd, Structure addr, int addrlen);
-
-	int close(int fd);
-
-	int shutdown(int sockfd, int how);
-
-	int read(int fd, byte[] buf, int count);
-
-	int write(int fd, byte[] buf, int count);
-
-	int stat(String path, StatAttachBSD statbuf);
-
-	int fstat(int fd, StatAttachBSD statbuf);
-
-	int chown(String path, int uid, int gid);
-
-	int kill(int pid, int sig);
-
-	int sysctl(int[] name, int namelen, Structure oldp, IntByReference oldlenp, Structure newp, int newlen);
-
-	int confstr(int name, byte[] buf, int len);
-
-	String strerror(int errnum);
-
-	int open(String pathname, int flags, int mode);
-
-	// Declare getSymbol() for constant lookup
-	Pointer getSymbol(String name);
-
-	// Declare pathconf() for PATH_MAX
-	int pathconf(String path, int name);
-
-	int mkdir(String absolutePath, int i);
-}
 
 public class BSDAttach {
 
@@ -378,8 +330,10 @@ public class BSDAttach {
 	    }
 
 	    static {
-	        System.loadLibrary("attach");
-	        tmpdir = BSDAttach.getTempDir();
+	      
+	    	//System.loadLibrary("attach");
+	        
+	    	tmpdir = BSDAttach.getTempDir();
 	    }
 		
 		
@@ -614,115 +568,7 @@ public class BSDAttach {
 
 }
 
-class NativeConstantsAttachBSD {
-	private static final CLibraryAttachBSD LIBC = CLibraryAttachBSD.INSTANCE;
 
-	public static final int _CS_DARWIN_USER_TEMP_DIR = 65537;
 
-//    // Load O_* flags from fcntl.h
-//    public static final int O_CREAT = getConstant("_O_CREAT");
-//    public static final int O_EXCL = getConstant("_O_EXCL");
-//    public static final int O_RDWR = getConstant("_O_RDWR");
-//
-//    // Load socket constants
-//    public static final int PF_UNIX = getConstant("_PF_UNIX");
-//    public static final int SOCK_STREAM = getConstant("_SOCK_STREAM");
-//    //public static final int AF_UNIX = getConstant("_AF_UNIX");
-//    public static final int SHUT_RDWR = getConstant("_SHUT_RDWR");
-//
-//    // Load signal constants
-//    public static final int SIGQUIT = getConstant("_SIGQUIT");
-//
-//    // Load sysctl constants
-//    public static final int CTL_KERN = getConstant("_CTL_KERN");
-//    public static final int KERN_PROC = getConstant("_KERN_PROC");
-//    public static final int KERN_PROC_PID = getConstant("_KERN_PROC_PID");
-//
-//    // Load system constants
-//    public static final int PATH_MAX = LIBC.pathconf("/", 0x01 /* _PC_PATH_MAX */);
-//    
 
-	// File flags (from macOS fcntl.h)
-	static int O_CREAT = 0x0200; // Octal 0400
-	static int O_EXCL = 0x0800; // Octal 02000
-	static int O_RDWR = 0x0002; // Octal 02
 
-	// Socket constants (from macOS sys/socket.h)
-	static short PF_UNIX = 1;
-	static short SOCK_STREAM = 1;
-	static short AF_UNIX = 1;
-	static int SHUT_RDWR = 2;
-
-	// Signals (from macOS signal.h)
-	static int SIGQUIT = 3;
-
-	// Sysctl constants (from macOS sys/sysctl.h)
-	static int CTL_KERN = 1;
-	static int KERN_PROC = 14;
-	static int KERN_PROC_PID = 1;
-
-	// macOS-specific constants
-	static int PATH_MAX = 1024;
-
-//
-//    // Special handling for macOS constants
-//    public static final int _CS_DARWIN_USER_TEMP_DIR;
-//    public static final short AF_UNIX; // Actually uint8_t (byte)
-//
-//    static {
-//        if (System.getProperty("os.name").contains("Mac")) {
-//            _CS_DARWIN_USER_TEMP_DIR = 65537; // Hardcode known macOS value
-//            AF_UNIX = 1; // Hardcode known value from sys/un.h
-//        } else {
-//            _CS_DARWIN_USER_TEMP_DIR = -1; // Not applicable on other OS
-//            AF_UNIX = (short) LIBC.getSymbol("_AF_UNIX").getInt(0);
-//        }
-//    }
-
-	private static int getConstant(String name) {
-		System.out.println(name);
-		Pointer ptr = LIBC.getSymbol(name);
-		if (ptr == null) {
-			throw new RuntimeException("Constant not found: " + name);
-		}
-		return ptr.getInt(0);
-	}
-}
-
-class StatAttachBSD extends Structure {
-	public int st_dev;
-	public short st_mode;
-	public short st_nlink;
-	public int st_ino;
-	public int st_uid;
-	public int st_gid;
-	public int st_rdev;
-	public long st_atime;
-	public long st_mtime;
-	public long st_ctime;
-	public long st_size;
-	public long st_blocks;
-	public int st_blksize;
-	public int st_flags;
-	public int st_gen;
-	public int st_lspare;
-	public long st_qspare1;
-	public long st_qspare2;
-
-	@Override
-	protected java.util.List<String> getFieldOrder() {
-		return java.util.Arrays.asList("st_dev", "st_mode", "st_nlink", "st_ino", "st_uid", "st_gid", "st_rdev",
-				"st_atime", "st_mtime", "st_ctime", "st_size", "st_blocks", "st_blksize", "st_flags", "st_gen",
-				"st_lspare", "st_qspare1", "st_qspare2");
-	}
-}
-
-class SockaddrUnAttachBSD extends Structure {
-	public short sun_family;
-	public byte[] sun_path = new byte[108]; // UNIX_PATH_MAX = 108
-
-	@Override
-	protected java.util.List<String> getFieldOrder() {
-		return java.util.Arrays.asList("sun_family", "sun_path");
-	}
-}

@@ -29,7 +29,7 @@ public class AttachLinux extends AttachUnix {
 	public static void attach() throws IOException {
 		int pid;
 		try {
-			pid = (int) io.smallrye.common.os.Process.getProcessId();
+			pid = (int) ProcessHandle.current().pid();
 		} catch (NumberFormatException x) {
 			throw new IOException("Invalid process identifier", x);
 		}
