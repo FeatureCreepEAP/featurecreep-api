@@ -64,79 +64,76 @@ public class BasicIO {
 		return new java.util.HashSet<>(java.util.Arrays.asList(objects));
 
 	}
-	
+
 	public static Set deImmutaliseSet(Set set) {
-	Set ret = new LinkedHashSet();
-	ret.addAll(set);
-	return ret;	
+		Set ret = new LinkedHashSet();
+		ret.addAll(set);
+		return ret;
 	}
-	
-    /**
-     * Converts a byte array to a string using UTF-8 encoding.
-     *
-     * @param bytes The byte array to convert.
-     * @return The converted string.
-     */
-    public static String byteArrayToString(byte[] bytes) {
-        String string = null;
+
+	/**
+	 * Converts a byte array to a string using UTF-8 encoding.
+	 *
+	 * @param bytes The byte array to convert.
+	 * @return The converted string.
+	 */
+	public static String byteArrayToString(byte[] bytes) {
+		String string = null;
 		try {
 			string = new String(bytes, "UTF-8");
 		} catch (UnsupportedEncodingException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-        
-        return string;
-    }
-    
-    /**
-     * Converts a String to a byte-array using UTF-8 encoding.
-     *
-     * @param str The String to convert.
-     * @return The converted byte[].
-     */
-    public static byte[] stringToByteArray(String str) {
-        return str.getBytes(StandardCharsets.UTF_8);
-    }
-   
-    public static String inputstreamToString(InputStream stream) {
-        StringBuilder textBuilder = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                textBuilder.append(line).append(System.lineSeparator()); // Add line break if needed
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return textBuilder.toString();
-    }
-    
-    
-    /**
-     * Converts an input stream to byte array
-     * @param inputStream
-     * @return
-     * @throws IOException
-     */
-    public static byte[] convertInputStreamToByteArray(InputStream inputStream) throws IOException {
-        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
-            byte[] buffer = new byte[1024];
-            int bytesRead;
-            
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                byteArrayOutputStream.write(buffer, 0, bytesRead);
-            }
-            
-            return byteArrayOutputStream.toByteArray();
-        }
-    }
-    
-    
+
+		return string;
+	}
+
+	/**
+	 * Converts a String to a byte-array using UTF-8 encoding.
+	 *
+	 * @param str The String to convert.
+	 * @return The converted byte[].
+	 */
+	public static byte[] stringToByteArray(String str) {
+		return str.getBytes(StandardCharsets.UTF_8);
+	}
+
+	public static String inputstreamToString(InputStream stream) {
+		StringBuilder textBuilder = new StringBuilder();
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+			String line;
+			while ((line = reader.readLine()) != null) {
+				textBuilder.append(line).append(System.lineSeparator()); // Add line break if needed
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return textBuilder.toString();
+	}
+
+	/**
+	 * Converts an input stream to byte array
+	 * 
+	 * @param inputStream
+	 * @return
+	 * @throws IOException
+	 */
+	public static byte[] convertInputStreamToByteArray(InputStream inputStream) throws IOException {
+		try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
+			byte[] buffer = new byte[1024];
+			int bytesRead;
+
+			while ((bytesRead = inputStream.read(buffer)) != -1) {
+				byteArrayOutputStream.write(buffer, 0, bytesRead);
+			}
+
+			return byteArrayOutputStream.toByteArray();
+		}
+	}
+
 	public static Supplier<InputStream> inputStreamSupplierFromBytes(byte[] bytes) {
 		return () -> new ByteArrayInputStream(bytes);
 	}
-    
-    
-    
+
 }

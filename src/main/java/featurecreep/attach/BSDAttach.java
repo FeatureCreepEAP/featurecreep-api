@@ -13,363 +13,340 @@ import featurecreep.attach.bsd.CLibraryAttachBSD;
 import featurecreep.attach.bsd.NativeConstantsAttachBSD;
 import featurecreep.attach.bsd.SockaddrUnAttachBSD;
 
-
-
 public class BSDAttach {
 
-	   private static final String tmpdir;
-	    String socket_path;
-	    private static final int ATTACH_ERROR_BADVERSION = 101;
-	
-	
-	    public BSDAttach(String vmid)
-		        throws IOException
-		    {
-		        // This provider only understands pids
-		        int pid = Integer.parseInt(vmid);
-		        if (pid < 1) {
-	//Bad
-		        }
+	private static final String tmpdir;
+	String socket_path;
+	private static final int ATTACH_ERROR_BADVERSION = 101;
 
-		        // Find the socket file. If not found then we attempt to start the
-		        // attach mechanism in the target VM by sending it a QUIT signal.
-		        // Then we attempt to find the socket file again.
-		        File socket_file = new File(tmpdir, ".java_pid" + pid);
-		        socket_path = socket_file.getPath();
-		        if (!socket_file.exists()) {
-		            File f = createAttachFile(pid);
-		            try {
-		            	BSDAttach.checkCatchesAndSendQuitTo(pid,true);
-		                // give the target VM time to start the attach mechanism
-		                final int delay_step = 100;
-		                final long timeout = 30000;
-		                long time_spend = 0;
-		                long delay = 0;
-		                do {
-		                    // Increase timeout on each attempt to reduce polling
-		                    delay += delay_step;
-		                    try {
-		                        Thread.sleep(delay);
-		                    } catch (InterruptedException x) { }
+	public BSDAttach(String vmid) throws IOException {
+		// This provider only understands pids
+		int pid = Integer.parseInt(vmid);
+		if (pid < 1) {
+			// Bad
+		}
 
-		                    time_spend += delay;
-		                    if (time_spend > timeout/2 && !socket_file.exists()) {
-		                        // Send QUIT again to give target VM the last chance to react
-		                        BSDAttach.checkCatchesAndSendQuitTo(pid, true);
-		                    }
-		                } while (time_spend <= timeout && !socket_file.exists());
-		                if (!socket_file.exists()) {
-	System.out.println("No socket file");
-		                }
-		            } catch (InterruptedException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					} finally {
-		                f.delete();
-		            }
-		        }
+		// Find the socket file. If not found then we attempt to start the
+		// attach mechanism in the target VM by sending it a QUIT signal.
+		// Then we attempt to find the socket file again.
+		File socket_file = new File(tmpdir, ".java_pid" + pid);
+		socket_path = socket_file.getPath();
+		if (!socket_file.exists()) {
+			File f = createAttachFile(pid);
+			try {
+				BSDAttach.checkCatchesAndSendQuitTo(pid, true);
+				// give the target VM time to start the attach mechanism
+				final int delay_step = 100;
+				final long timeout = 30000;
+				long time_spend = 0;
+				long delay = 0;
+				do {
+					// Increase timeout on each attempt to reduce polling
+					delay += delay_step;
+					try {
+						Thread.sleep(delay);
+					} catch (InterruptedException x) {
+					}
 
-		        // Check that the file owner/permission to avoid attaching to
-		        // bogus process
-		        BSDAttach.checkPermissions(socket_path);
+					time_spend += delay;
+					if (time_spend > timeout / 2 && !socket_file.exists()) {
+						// Send QUIT again to give target VM the last chance to react
+						BSDAttach.checkCatchesAndSendQuitTo(pid, true);
+					}
+				} while (time_spend <= timeout && !socket_file.exists());
+				if (!socket_file.exists()) {
+					System.out.println("No socket file");
+				}
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} finally {
+				f.delete();
+			}
+		}
 
-		        // Check that we can connect to the process
-		        // - this ensures we throw the permission denied error now rather than
-		        // later when we attempt to enqueue a command.
-		        int s = BSDAttach.createSocket();
-		        try {
-		        	BSDAttach.connectSocket(s, socket_path);
-		        } finally {
-		        	BSDAttach.closeSocket(s);
-		        }
-		    }
-	
-	
+		// Check that the file owner/permission to avoid attaching to
+		// bogus process
+		BSDAttach.checkPermissions(socket_path);
 
-		
-		
-		
-		
-		 /**
-	     * Detach from the target VM
-	     */
-	    public void detach() throws IOException {
-	        synchronized (this) {
-	            if (socket_path != null) {
-	                socket_path = null;
-	            }
-	        }
-	    }
+		// Check that we can connect to the process
+		// - this ensures we throw the permission denied error now rather than
+		// later when we attempt to enqueue a command.
+		int s = BSDAttach.createSocket();
+		try {
+			BSDAttach.connectSocket(s, socket_path);
+		} finally {
+			BSDAttach.closeSocket(s);
+		}
+	}
 
-	    // protocol version
-	    private static final String PROTOCOL_VERSION = "1";
+	/**
+	 * Detach from the target VM
+	 */
+	public void detach() throws IOException {
+		synchronized (this) {
+			if (socket_path != null) {
+				socket_path = null;
+			}
+		}
+	}
 
-	    /**
-	     * Execute the given command in the target VM.
-	     */
-	    InputStream execute(String cmd, Object ... args) throws IOException {
-	        assert args.length <= 3;                // includes null
-	        checkNulls(args);
+	// protocol version
+	private static final String PROTOCOL_VERSION = "1";
 
-	        // did we detach?
-	        synchronized (this) {
-	            if (socket_path == null) {
-	                throw new IOException("Detached from target VM");
-	            }
-	        }
+	/**
+	 * Execute the given command in the target VM.
+	 */
+	InputStream execute(String cmd, Object... args) throws IOException {
+		assert args.length <= 3; // includes null
+		checkNulls(args);
 
-	        // create UNIX socket
-	        int s = BSDAttach.createSocket();
+		// did we detach?
+		synchronized (this) {
+			if (socket_path == null) {
+				throw new IOException("Detached from target VM");
+			}
+		}
 
-	        // connect to target VM
-	        try {
-	        	BSDAttach.connectSocket(s, socket_path);
-	        } catch (IOException x) {
-	        	BSDAttach.closeSocket(s);
-	            throw x;
-	        }
+		// create UNIX socket
+		int s = BSDAttach.createSocket();
 
-	        IOException ioe = null;
+		// connect to target VM
+		try {
+			BSDAttach.connectSocket(s, socket_path);
+		} catch (IOException x) {
+			BSDAttach.closeSocket(s);
+			throw x;
+		}
 
-	        // connected - write request
-	        // <ver> <cmd> <args...>
-	        try {
-	            writeString(s, PROTOCOL_VERSION);
-	            writeString(s, cmd);
+		IOException ioe = null;
 
-	            for (int i = 0; i < 3; i++) {
-	                if (i < args.length && args[i] != null) {
-	                    writeString(s, (String)args[i]);
-	                } else {
-	                    writeString(s, "");
-	                }
-	            }
-	        } catch (IOException x) {
-	            ioe = x;
-	        }
+		// connected - write request
+		// <ver> <cmd> <args...>
+		try {
+			writeString(s, PROTOCOL_VERSION);
+			writeString(s, cmd);
 
+			for (int i = 0; i < 3; i++) {
+				if (i < args.length && args[i] != null) {
+					writeString(s, (String) args[i]);
+				} else {
+					writeString(s, "");
+				}
+			}
+		} catch (IOException x) {
+			ioe = x;
+		}
 
-	        // Create an input stream to read reply
-	        SocketInputStreamImpl sis = new SocketInputStreamImpl(s);
+		// Create an input stream to read reply
+		SocketInputStreamImpl sis = new SocketInputStreamImpl(s);
 
-	        // Process the command completion status
-	        processCompletionStatus(ioe, cmd, sis);
+		// Process the command completion status
+		processCompletionStatus(ioe, cmd, sis);
 
-	        // Return the input stream so that the command output can be read
-	        return sis;
-	    }
-	    
-	    /*
-	     * Utility method to process the completion status after command execution.
-	     * If we get IOE during previous command execution, delay throwing it until
-	     * completion status has been read.
-	     */
-	    void processCompletionStatus(IOException ioe, String cmd, InputStream sis) throws IOException {
-	        // Read the command completion status
-	    	System.out.println(cmd);
-	    	int completionStatus;
-	        try {
-	            completionStatus = readInt(sis);
-	        } catch (IOException x) {
-	            sis.close();
-	            if (ioe != null) {
-	                throw ioe;
-	            } else {
-	                throw x;
-	            }
-	        }
-	        if (completionStatus != 0) {
-	            // read from the stream and use that as the error message
-	            String message = readErrorMessage(sis);
-	            System.out.println(message);
-	            sis.close();
+		// Return the input stream so that the command output can be read
+		return sis;
+	}
 
-	            // In the event of a protocol mismatch then the target VM
-	            // returns a known error so that we can throw a reasonable
-	            // error.
-	            if (completionStatus == ATTACH_ERROR_BADVERSION) {
-	                throw new IOException("Protocol mismatch with target VM");
-	            }
+	/*
+	 * Utility method to process the completion status after command execution. If
+	 * we get IOE during previous command execution, delay throwing it until
+	 * completion status has been read.
+	 */
+	void processCompletionStatus(IOException ioe, String cmd, InputStream sis) throws IOException {
+		// Read the command completion status
+		System.out.println(cmd);
+		int completionStatus;
+		try {
+			completionStatus = readInt(sis);
+		} catch (IOException x) {
+			sis.close();
+			if (ioe != null) {
+				throw ioe;
+			} else {
+				throw x;
+			}
+		}
+		if (completionStatus != 0) {
+			// read from the stream and use that as the error message
+			String message = readErrorMessage(sis);
+			System.out.println(message);
+			sis.close();
 
-	            // Special-case the "load" command so that the right exception is
-	            // thrown.
-	            if (cmd.equals("load")) {
-	                String msg = "Failed to load agent library";
-	                if (!message.isEmpty()) {
-	                    msg += ": " + message;
-	                }
-	               // throw new AgentLoadException(msg);
-	            } else {
-	                if (message.isEmpty()) {
-	                    message = "Command failed in target VM";
-	                }
-	              //  throw new AttachOperationFailedException(message);
-	            }
-	        }
-	    }
-	    
-	    
-	    
-	    
-	    
-	    /*
-	     * Utility method to read an 'int' from the input stream. Ideally
-	     * we should be using java.util.Scanner here but this implementation
-	     * guarantees not to read ahead.
-	     */
-	    int readInt(InputStream in) throws IOException {
-	        StringBuilder sb = new StringBuilder();
+			// In the event of a protocol mismatch then the target VM
+			// returns a known error so that we can throw a reasonable
+			// error.
+			if (completionStatus == ATTACH_ERROR_BADVERSION) {
+				throw new IOException("Protocol mismatch with target VM");
+			}
 
-	        // read to \n or EOF
-	        int n;
-	        byte buf[] = new byte[1];
-	        do {
-	            n = in.read(buf, 0, 1);
-	            if (n > 0) {
-	                char c = (char)buf[0];
-	                if (c == '\n') {
-	                    break;                  // EOL found
-	                } else {
-	                    sb.append(c);
-	                }
-	            }
-	        } while (n > 0);
+			// Special-case the "load" command so that the right exception is
+			// thrown.
+			if (cmd.equals("load")) {
+				String msg = "Failed to load agent library";
+				if (!message.isEmpty()) {
+					msg += ": " + message;
+				}
+				// throw new AgentLoadException(msg);
+			} else {
+				if (message.isEmpty()) {
+					message = "Command failed in target VM";
+				}
+				// throw new AttachOperationFailedException(message);
+			}
+		}
+	}
 
-	        if (sb.length() == 0) {
-	            throw new IOException("Premature EOF");
-	        }
+	/*
+	 * Utility method to read an 'int' from the input stream. Ideally we should be
+	 * using java.util.Scanner here but this implementation guarantees not to read
+	 * ahead.
+	 */
+	int readInt(InputStream in) throws IOException {
+		StringBuilder sb = new StringBuilder();
 
-	        int value;
-	        try {
-	            value = Integer.parseInt(sb.toString());
-	        } catch (NumberFormatException x) {
-	            throw new IOException("Non-numeric value found - int expected");
-	        }
-	        return value;
-	    }
-	    
-	    
+		// read to \n or EOF
+		int n;
+		byte buf[] = new byte[1];
+		do {
+			n = in.read(buf, 0, 1);
+			if (n > 0) {
+				char c = (char) buf[0];
+				if (c == '\n') {
+					break; // EOL found
+				} else {
+					sb.append(c);
+				}
+			}
+		} while (n > 0);
 
-	    /*
-	     * InputStream for the socket connection to get target VM
-	     */
-	    private static class SocketInputStreamImpl extends InputStream {
-	       long fd;
-	    	public SocketInputStreamImpl(long fd) {
-	    		this.fd=fd;
-	        }
+		if (sb.length() == 0) {
+			throw new IOException("Premature EOF");
+		}
 
-	        
-	        protected int read(long fd, byte[] bs, int off, int len) throws IOException {
-	            return BSDAttach.readSocket((int)fd, bs, off, len);
-	        }
+		int value;
+		try {
+			value = Integer.parseInt(sb.toString());
+		} catch (NumberFormatException x) {
+			throw new IOException("Non-numeric value found - int expected");
+		}
+		return value;
+	}
 
-	        
-	        protected void close(long fd) throws IOException {
-	        	BSDAttach.closeSocket((int)fd);
-	        }
-	        
-	        public synchronized int read() throws IOException {
-	            byte b[] = new byte[1];
-	            int n = this.read(b, 0, 1);
-	            if (n == 1) {
-	                return b[0] & 0xff;
-	            } else {
-	                return -1;
-	            }
-	        }
+	/*
+	 * InputStream for the socket connection to get target VM
+	 */
+	private static class SocketInputStreamImpl extends InputStream {
+		long fd;
 
-	        public synchronized int read(byte[] bs, int off, int len) throws IOException {
-	            if ((off < 0) || (off > bs.length) || (len < 0) ||
-	                ((off + len) > bs.length) || ((off + len) < 0)) {
-	                throw new IndexOutOfBoundsException();
-	            } else if (len == 0) {
-	                return 0;
-	            }
-	            return read(fd, bs, off, len);
-	        }
+		public SocketInputStreamImpl(long fd) {
+			this.fd = fd;
+		}
 
-	        public synchronized void close() throws IOException {
-	            if (fd != -1) {
-	                long toClose = fd;
-	                fd = -1;
-	                close(toClose);
-	            }
-	        }
-	    }
+		protected int read(long fd, byte[] bs, int off, int len) throws IOException {
+			return BSDAttach.readSocket((int) fd, bs, off, len);
+		}
 
-	    /*
-	     * Write/sends the given to the target VM. String is transmitted in
-	     * UTF-8 encoding.
-	     */
-	    private void writeString(int fd, String s) throws IOException {
-	        if (s.length() > 0) {
-	            byte[] b = s.getBytes("UTF-8");
-	            BSDAttach.writeSocket(fd, b, 0, b.length);
-	        }
-	        byte b[] = new byte[1];
-	        b[0] = 0;
-	        BSDAttach.writeSocket(fd, b, 0, 1);
-	    }
+		protected void close(long fd) throws IOException {
+			BSDAttach.closeSocket((int) fd);
+		}
 
-	    private File createAttachFile(int pid) throws IOException {
-	        File f = new File(tmpdir, ".attach_pid" + pid);
-	        BSDAttach.createAttachFile(f.getPath());
-	        return f;
-	    }
+		public synchronized int read() throws IOException {
+			byte b[] = new byte[1];
+			int n = this.read(b, 0, 1);
+			if (n == 1) {
+				return b[0] & 0xff;
+			} else {
+				return -1;
+			}
+		}
 
-	    protected static void checkNulls(Object... args) {
-	        for (Object arg : args) {
-	            if (arg instanceof String) {
-	            	String s = (String)arg;
-	                if (s.indexOf(0) >= 0) {
-	                    throw new IllegalArgumentException("illegal null character in command");
-	                }
-	            }
-	        }
-	    }
+		public synchronized int read(byte[] bs, int off, int len) throws IOException {
+			if ((off < 0) || (off > bs.length) || (len < 0) || ((off + len) > bs.length) || ((off + len) < 0)) {
+				throw new IndexOutOfBoundsException();
+			} else if (len == 0) {
+				return 0;
+			}
+			return read(fd, bs, off, len);
+		}
 
-	    static {
-	      
-	    	//System.loadLibrary("attach");
-	        
-	    	tmpdir = BSDAttach.getTempDir();
-	    }
-		
-		
-	    /*
-	     * Utility method to read data into a String.
-	     */
-	    String readErrorMessage(InputStream in) throws IOException {
-	        String s;
-	        StringBuilder message = new StringBuilder();
-	        BufferedReader br = new BufferedReader(new InputStreamReader(in));
-	        while ((s = br.readLine()) != null) {
-	            message.append(s);
-	        }
-	        return message.toString();
-	    }
-	    
-	    
-	    public void loadAgent(String agent, String options)
-	            throws IOException
-	        {
-	            if (agent == null) {
-	                throw new NullPointerException("agent cannot be null");
-	            }
+		public synchronized void close() throws IOException {
+			if (fd != -1) {
+				long toClose = fd;
+				fd = -1;
+				close(toClose);
+			}
+		}
+	}
 
-	            String args = agent;
-	            if (options != null) {
-	                args = args + "=" + options;
-	            }
-	            try {
-	                loadAgentLibrary("instrument", args);
-	            } catch (Exception x) {
-	                /*
-	                 * Translate interesting errors into the right exception and
-	                 * message (FIXME: create a better interface to the instrument
-	                 * implementation so this isn't necessary)
-	                 */
+	/*
+	 * Write/sends the given to the target VM. String is transmitted in UTF-8
+	 * encoding.
+	 */
+	private void writeString(int fd, String s) throws IOException {
+		if (s.length() > 0) {
+			byte[] b = s.getBytes("UTF-8");
+			BSDAttach.writeSocket(fd, b, 0, b.length);
+		}
+		byte b[] = new byte[1];
+		b[0] = 0;
+		BSDAttach.writeSocket(fd, b, 0, 1);
+	}
+
+	private File createAttachFile(int pid) throws IOException {
+		File f = new File(tmpdir, ".attach_pid" + pid);
+		BSDAttach.createAttachFile(f.getPath());
+		return f;
+	}
+
+	protected static void checkNulls(Object... args) {
+		for (Object arg : args) {
+			if (arg instanceof String) {
+				String s = (String) arg;
+				if (s.indexOf(0) >= 0) {
+					throw new IllegalArgumentException("illegal null character in command");
+				}
+			}
+		}
+	}
+
+	static {
+
+		// System.loadLibrary("attach");
+
+		tmpdir = BSDAttach.getTempDir();
+	}
+
+	/*
+	 * Utility method to read data into a String.
+	 */
+	String readErrorMessage(InputStream in) throws IOException {
+		String s;
+		StringBuilder message = new StringBuilder();
+		BufferedReader br = new BufferedReader(new InputStreamReader(in));
+		while ((s = br.readLine()) != null) {
+			message.append(s);
+		}
+		return message.toString();
+	}
+
+	public void loadAgent(String agent, String options) throws IOException {
+		if (agent == null) {
+			throw new NullPointerException("agent cannot be null");
+		}
+
+		String args = agent;
+		if (options != null) {
+			args = args + "=" + options;
+		}
+		try {
+			loadAgentLibrary("instrument", args);
+		} catch (Exception x) {
+			/*
+			 * Translate interesting errors into the right exception and message (FIXME:
+			 * create a better interface to the instrument implementation so this isn't
+			 * necessary)
+			 */
 //	                int rc = x.returnValue();
 //	                switch (rc) {
 //	                    case JNI_ENOMEM:
@@ -387,68 +364,41 @@ public class BSDAttach {
 //	                        throw new Exception("" +
 //	                            "Failed to load agent - unknown reason: " + rc);
 //	                }
-	            }
-	        }
-	    
-	    public void loadAgentLibrary(String agentLibrary, String options)
-	          throws Exception
-	        {
-	            loadAgentLibrary(agentLibrary, false, options);
-	        }
-	    
-	    
-	    private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String options)
-	          throws Exception
-	        {
-	            if (agentLibrary == null) {
-	                throw new NullPointerException("agentLibrary cannot be null");
-	            }
+		}
+	}
 
-	            String msgPrefix = "return code: ";
-	            InputStream in = execute("load",
-	                                     agentLibrary,
-	                                     isAbsolute ? "true" : "false",
-	                                     options);
-	            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
-	                String result = reader.readLine();
-	                if (result == null) {
-	                    throw new Exception("Target VM did not respond");
-	                } else if (result.startsWith(msgPrefix)) {
-	                    int retCode = Integer.parseInt(result.substring(msgPrefix.length()));
-	                    if (retCode != 0) {
-	                        throw new Exception("Agent_OnAttach failed " + retCode);
-	                    }
-	                } else {
-	                    throw new Exception(result);
-	                }
-	            }
-	        }
-		
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	    
-	
+	public void loadAgentLibrary(String agentLibrary, String options) throws Exception {
+		loadAgentLibrary(agentLibrary, false, options);
+	}
+
+	private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String options) throws Exception {
+		if (agentLibrary == null) {
+			throw new NullPointerException("agentLibrary cannot be null");
+		}
+
+		String msgPrefix = "return code: ";
+		InputStream in = execute("load", agentLibrary, isAbsolute ? "true" : "false", options);
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
+			String result = reader.readLine();
+			if (result == null) {
+				throw new Exception("Target VM did not respond");
+			} else if (result.startsWith(msgPrefix)) {
+				int retCode = Integer.parseInt(result.substring(msgPrefix.length()));
+				if (retCode != 0) {
+					throw new Exception("Agent_OnAttach failed " + retCode);
+				}
+			} else {
+				throw new Exception(result);
+			}
+		}
+	}
+
 	public static int createSocket() throws IOException {
-		int fd = CLibraryAttachBSD.INSTANCE.socket(NativeConstantsAttachBSD.PF_UNIX, NativeConstantsAttachBSD.SOCK_STREAM, 0);
+		int fd = CLibraryAttachBSD.INSTANCE.socket(NativeConstantsAttachBSD.PF_UNIX,
+				NativeConstantsAttachBSD.SOCK_STREAM, 0);
 		if (fd == -1) {
-			throw new IOException("Failed to create socket: " + CLibraryAttachBSD.INSTANCE.strerror(Native.getLastError()));
+			throw new IOException(
+					"Failed to create socket: " + CLibraryAttachBSD.INSTANCE.strerror(Native.getLastError()));
 		}
 		return fd;
 	}
@@ -553,9 +503,11 @@ public class BSDAttach {
 	}
 
 	public static void createAttachFile(String path) throws IOException {
-		int fd = CLibraryAttachBSD.INSTANCE.open(path, NativeConstantsAttachBSD.O_CREAT | NativeConstantsAttachBSD.O_EXCL, 0600);
+		int fd = CLibraryAttachBSD.INSTANCE.open(path,
+				NativeConstantsAttachBSD.O_CREAT | NativeConstantsAttachBSD.O_EXCL, 0600);
 		if (fd == -1) {
-			throw new IOException("Failed to create file: " + CLibraryAttachBSD.INSTANCE.strerror(Native.getLastError()));
+			throw new IOException(
+					"Failed to create file: " + CLibraryAttachBSD.INSTANCE.strerror(Native.getLastError()));
 		}
 		try {
 			int uid = CLibraryAttachBSD.INSTANCE.geteuid();
@@ -567,8 +519,3 @@ public class BSDAttach {
 	}
 
 }
-
-
-
-
-

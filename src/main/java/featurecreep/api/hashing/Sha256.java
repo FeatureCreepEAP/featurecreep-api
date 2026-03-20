@@ -12,11 +12,12 @@ public class Sha256 implements Hash {
 	public static String getHashFromFileAsString(File file) throws NoSuchAlgorithmException, IOException {
 		return bytesToHex(calculateFileHash(file));
 	}
-	
-	public static String getHashFromInputStreamAsString(InputStream stream) throws NoSuchAlgorithmException, IOException {
+
+	public static String getHashFromInputStreamAsString(InputStream stream)
+			throws NoSuchAlgorithmException, IOException {
 		return bytesToHex(calculateSteamHash(stream));
 	}
-	
+
 	public static String getHashFromBytesAsString(byte[] bytes) throws NoSuchAlgorithmException, IOException {
 		return bytesToHex(calculateBytesHash(bytes));
 	}

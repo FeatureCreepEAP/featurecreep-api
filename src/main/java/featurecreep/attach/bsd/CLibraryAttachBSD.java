@@ -8,9 +8,7 @@ import com.sun.jna.ptr.IntByReference;
 
 //JNA library interface
 public interface CLibraryAttachBSD extends Library {
-	
-	
-	
+
 	public CLibraryAttachBSD INSTANCE = (CLibraryAttachBSD) Native.loadLibrary("c", CLibraryAttachBSD.class);
 
 	// Add missing functions

@@ -23,7 +23,7 @@ public class StatAttachBSD extends Structure {
 	public long st_qspare2;
 
 	@Override
-	public  java.util.List<String> getFieldOrder() {
+	public java.util.List<String> getFieldOrder() {
 		return java.util.Arrays.asList("st_dev", "st_mode", "st_nlink", "st_ino", "st_uid", "st_gid", "st_rdev",
 				"st_atime", "st_mtime", "st_ctime", "st_size", "st_blocks", "st_blksize", "st_flags", "st_gen",
 				"st_lspare", "st_qspare1", "st_qspare2");

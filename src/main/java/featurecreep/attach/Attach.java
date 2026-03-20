@@ -38,14 +38,12 @@ public class Attach {
 				BSDAttach bsd = new BSDAttach(String.valueOf(ProcessHandle.current().pid()));
 				System.out.println("loading agent");
 				bsd.loadAgent(agent, "testargs");
-			}else if (OS.current().equals(OS.WINDOWS)) {//Possibly OS/2 or Arca, though that could be a UNIX?
-	            AttachWindows vm = new AttachWindows((int)ProcessHandle.current().pid());
+			} else if (OS.current().equals(OS.WINDOWS)) {// Possibly OS/2 or Arca, though that could be a UNIX?
+				AttachWindows vm = new AttachWindows((int) ProcessHandle.current().pid());
 				System.out.println("loading agent");
-				 vm.loadAgent(agent, null);
+				vm.loadAgent(agent, null);
 			}
-			
-			
-			
+
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

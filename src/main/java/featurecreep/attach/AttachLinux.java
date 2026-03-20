@@ -70,7 +70,7 @@ public class AttachLinux extends AttachUnix {
 			}
 		}
 
-		//checkPermissions(socket_path);
+		// checkPermissions(socket_path);
 
 		int s = socket();
 		try {

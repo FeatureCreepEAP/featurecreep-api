@@ -13,21 +13,21 @@ import com.asbestosstar.crashdetector.analizador.Verificaciones;
 import com.asbestosstar.crashdetector.analizador.Analizador;
 
 /**
- * Envoltura para adaptar AppError a Verificaciones de CrashDetector.
- * NOTA: CrashDetector puede correr en un proceso separado. Por ello,
- * el registro de errores contempla dos rutas:
+ * Envoltura para adaptar AppError a Verificaciones de CrashDetector. NOTA:
+ * CrashDetector puede correr en un proceso separado. Por ello, el registro de
+ * errores contempla dos rutas:
  *
- * 1) Proceso CrashDetector (inCDProcess=true):
- *    - Se puede registrar directamente el Verificaciones en Analizador.verificaciones.
+ * 1) Proceso CrashDetector (inCDProcess=true): - Se puede registrar
+ * directamente el Verificaciones en Analizador.verificaciones.
  *
- * 2) Proceso del juego (inCDProcess=false):
- *    - No se puede acceder al Analizador directamente. Se deja un "ticket"
- *      en la carpeta de intercom (featurecreep-intercom/registry) con
- *      metadatos (id, clase, dynamic, etc.) para que CrashDetector los
- *      re-importe durante su arranque (p. ej. en CDExtention.procesoDelApp()).
+ * 2) Proceso del juego (inCDProcess=false): - No se puede acceder al Analizador
+ * directamente. Se deja un "ticket" en la carpeta de intercom
+ * (featurecreep-intercom/registry) con metadatos (id, clase, dynamic, etc.)
+ * para que CrashDetector los re-importe durante su arranque (p. ej. en
+ * CDExtention.procesoDelApp()).
  *
- * Para errores "dynamic" se recomienda hacer la mayor parte del parse en
- * el proceso del juego y escribir resultados en archivos propios de intercom.
+ * Para errores "dynamic" se recomienda hacer la mayor parte del parse en el
+ * proceso del juego y escribir resultados en archivos propios de intercom.
  */
 public class CrashDetectorError implements Verificaciones {
 
@@ -79,8 +79,7 @@ public class CrashDetectorError implements Verificaciones {
 
 	@Override
 	public QuickFix solucion() {
-		return new QuickFix.Builder(nombre())
-				.agregarEtiqueta(MonitorDePID.idioma.noHaySolucionDisponible())
+		return new QuickFix.Builder(nombre()).agregarEtiqueta(MonitorDePID.idioma.noHaySolucionDisponible())
 				.construir();
 	}
 
@@ -92,12 +91,14 @@ public class CrashDetectorError implements Verificaciones {
 
 	/**
 	 * Registra el error para CrashDetector, considerando si estamos en el proceso
-	 * de CrashDetector (registro directo) o en el proceso del juego (ticket en intercom).
+	 * de CrashDetector (registro directo) o en el proceso del juego (ticket en
+	 * intercom).
 	 *
 	 * @param envoltura instancia ya envuelta (CrashDetectorError)
 	 * @param dynamic   true si el AppError depende de clases/recursos del juego o
-	 *                  se genera dinámicamente (nested jars, generación en runtime);
-	 *                  false si es estático y el .class es accesible para CrashDetector.
+	 *                  se genera dinámicamente (nested jars, generación en
+	 *                  runtime); false si es estático y el .class es accesible para
+	 *                  CrashDetector.
 	 */
 	public static void register(CrashDetectorError envoltura, boolean dynamic) {
 		if (envoltura == null || envoltura.error == null) {
@@ -106,7 +107,8 @@ public class CrashDetectorError implements Verificaciones {
 
 		if (inCDProcess) {
 			// --- Ruta 1: estamos dentro del proceso de CrashDetector ---
-			// Podemos registrar directamente la verificación para que el Analizador la ejecute.
+			// Podemos registrar directamente la verificación para que el Analizador la
+			// ejecute.
 			try {
 				Analizador.verificaciones.add(envoltura);
 			} catch (Throwable t) {
@@ -145,12 +147,14 @@ public class CrashDetectorError implements Verificaciones {
 
 			// NOTA sobre dynamic:
 			// - dynamic=true: CrashDetector NO debe intentar instanciar la clase del juego.
-			//   En su lugar, un importador del lado CrashDetector puede crear un proxy
-			//   (p. ej. otra CrashDetectorError vacía) que sólo lee resultados pre-procesados
-			//   desde featurecreep-intercom (p. ej. /results/<id>.json) escritos por el juego.
-			// - dynamic=false: CrashDetector puede intentar cargar/reflejar la clase indicada
-			//   si el classpath compartido lo permite. Si no, al menos tendrá el id/nombre
-			//   para mostrar algo o pedir al usuario los resultados generados.
+			// En su lugar, un importador del lado CrashDetector puede crear un proxy
+			// (p. ej. otra CrashDetectorError vacía) que sólo lee resultados pre-procesados
+			// desde featurecreep-intercom (p. ej. /results/<id>.json) escritos por el
+			// juego.
+			// - dynamic=false: CrashDetector puede intentar cargar/reflejar la clase
+			// indicada
+			// si el classpath compartido lo permite. Si no, al menos tendrá el id/nombre
+			// para mostrar algo o pedir al usuario los resultados generados.
 
 			try (OutputStream os = new FileOutputStream(archivoTicket)) {
 				props.store(os, "Registro de AppError para CrashDetector (dynamic=" + dynamic + ")");
@@ -160,7 +164,6 @@ public class CrashDetectorError implements Verificaciones {
 		}
 	}
 
-
 	private static String safe(String s) {
 		return s == null ? "" : s;
 	}
@@ -169,7 +172,8 @@ public class CrashDetectorError implements Verificaciones {
 	 * Sanea un nombre para archivo simple (ASCII seguro).
 	 */
 	private static String sanitizarNombreArchivo(String nombre) {
-		if (nombre == null || nombre.isEmpty()) return "sin_id";
+		if (nombre == null || nombre.isEmpty())
+			return "sin_id";
 		// Reemplazar todo lo que no sea [A-Za-z0-9._-] por '_'
 		return nombre.replaceAll("[^A-Za-z0-9._-]", "_");
 	}
