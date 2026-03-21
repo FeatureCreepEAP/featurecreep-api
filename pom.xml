@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.asbestosstar</groupId>
   <artifactId>featurecreep-api</artifactId>
-  <version>6.0.0-am3</version>
+  <version>6.0.0-am4</version>
   <name>FeatureCreep API</name>
   <description>Java General Purpose API providing stuff for remapping, parsing, bytecode manipulation, and other capabilities</description>
 
@@ -176,11 +176,12 @@
  	
  	
  	
-<dependency>
-    <groupId>com.asbestosstar</groupId>
-    <artifactId>featurecreep-loader</artifactId>
-    <version>4.0pre19</version><!-- Version final para java 8-->
-</dependency>
+		<dependency>
+			<groupId>com.asbestosstar</groupId>
+			<artifactId>featurecreep-loader</artifactId>
+			<version>6.0.0-am3</version>
+			<scope>provided</scope>
+		</dependency>
  	
  	
  	
