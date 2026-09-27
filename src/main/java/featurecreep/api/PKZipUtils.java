@@ -3,7 +3,6 @@ package featurecreep.api;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -11,22 +10,14 @@ import java.util.zip.ZipOutputStream;
 public class PKZipUtils {
 
 	public static void zipDirectory(File directory, String output) throws IOException {
-		try {
-// Create a new ZIP file in the native mods folder  
-			File zipFile = new File(output);
-			zipFile.getParentFile().mkdirs();
-			zipFile.createNewFile();
-
-// Create a ZIP output stream  
-			try (FileOutputStream fos = new FileOutputStream(zipFile); ZipOutputStream zos = new ZipOutputStream(fos)) {
-
-				// Recursively add files and directories to the ZIP output stream
-				zipDirectory(directory, zos, "");
-
-				System.out.println("ZIP file created successfully!");
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
+		File zipFile = new File(output);
+		File parent = zipFile.getParentFile();
+		if (parent != null) {
+			parent.mkdirs();
+		}
+		try (FileOutputStream fos = new FileOutputStream(zipFile);
+				ZipOutputStream zos = new ZipOutputStream(fos)) {
+			zipDirectory(directory, zos, "");
 		}
 	}
 

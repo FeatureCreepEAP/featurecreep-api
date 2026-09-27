@@ -2,54 +2,76 @@ package featurecreep.attach;
 
 import featurecreep.api.lowlevel.OS;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+
 /**
- * This is a reimplementation of Suns Attach mechanism which does not require a
- * JDK. It mostly uses JNA to avoid native code. Still in Alpha, I wrote all
- * these different times so formattings a bit different and not stable as i plan
- * to change it a lot. AIX is untested, Linux Aand Solaris Have traces sometimes
- * and Linux sometimes has C lib crashes outside of VMs, Windows can only attach
- * to self at this time, some BSDs and Illuminos are untested, Many SYSVs are
- * unsupported as are most other NONUnix 0Ss, are some of the issues.
+ * FeatureCreep's direct HotSpot attach implementation.
+ *
+ * <p>This deliberately does not call {@code jdk.attach}. On Unix-like systems it
+ * speaks the HotSpot attach protocol directly; on Windows it uses the JVM's
+ * enqueue-operation entry point. Native OS calls are made through Java 25 FFM.</p>
  */
-public class Attach {
+public final class Attach {
+    private Attach() {}
 
-	public static void attach(String agent, String args) {
-		// String str = agent + "=" + args;
-		// String str = agent;
+    /** Attach an agent to this JVM using the direct FeatureCreep attach path. */
+    public static void attach(String agent, String args) {
+        try {
+            attach(ProcessHandle.current().pid(), agent, args);
+        } catch (IOException ex) {
+            throw new UncheckedIOException("FeatureCreep attach failed", ex);
+        }
+    }
 
-		try {
-			if (OS.current().equals(OS.LINUX)) {
+    /**
+     * Attach an agent to an arbitrary target JVM without using {@code jdk.attach}.
+     *
+     * @param pid target process ID
+     * @param agent path to the Java agent JAR
+     * @param args agentmain arguments, or {@code null}
+     */
+    public static void attach(long pid, String agent, String args) throws IOException {
+        if (pid <= 0 || pid > Integer.MAX_VALUE) throw new IllegalArgumentException("Invalid process identifier: " + pid);
+        if (agent == null || agent.isBlank()) throw new IllegalArgumentException("agent cannot be blank");
+        int targetPid = (int) pid;
 
-				AttachLinux.attach();
-				System.out.println("loading agent");
-				AttachLinux.loadAgent(agent, "testargs");
-			} else if (OS.current().equals(OS.AIX)) {
-
-				AttachAix.attach();
-				System.out.println("loading agent");
-				AttachAix.loadAgent(agent, "testargs");
-			} else if (OS.current().equals(OS.SOLARIS)) {
-
-				AttachSolaris.attach();
-				System.out.println("loading agent");
-				AttachSolaris.loadAgent(agent, "testargs");
-			} else if (OS.current().equals(OS.MAC) || OS.current().name().toLowerCase().contains("bsd")) {
-
-				BSDAttach bsd = new BSDAttach(String.valueOf(ProcessHandle.current().pid()));
-				System.out.println("loading agent");
-				bsd.loadAgent(agent, "testargs");
-			} else if (OS.current().equals(OS.WINDOWS)) {// Possibly OS/2 or Arca, though that could be a UNIX?
-				AttachWindows vm = new AttachWindows((int) ProcessHandle.current().pid());
-				System.out.println("loading agent");
-				vm.loadAgent(agent, null);
-			}
-
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		System.out.println("done loading agent");
-
-	}
-
+        switch (OS.current()) {
+            case LINUX -> {
+                try {
+                    AttachLinux.attach(targetPid);
+                    AttachLinux.loadAgent(agent, args);
+                } finally {
+                    AttachLinux.detach();
+                }
+            }
+            case AIX -> {
+                try {
+                    AttachAix.attach(targetPid);
+                    AttachAix.loadAgent(agent, args);
+                } finally {
+                    AttachAix.detach();
+                }
+            }
+            case SOLARIS -> {
+                try {
+                    AttachSolaris.attach(targetPid);
+                    AttachSolaris.loadAgent(agent, args);
+                } finally {
+                    AttachSolaris.detach();
+                }
+            }
+            case MAC, BSD -> {
+                try (BSDAttach bsd = new BSDAttach(targetPid)) {
+                    bsd.loadAgent(agent, args);
+                }
+            }
+            case WINDOWS -> {
+                try (AttachWindows windows = new AttachWindows(targetPid)) {
+                    windows.loadAgent(agent, args);
+                }
+            }
+            default -> throw new IOException("Direct HotSpot attach is unsupported on " + System.getProperty("os.name"));
+        }
+    }
 }

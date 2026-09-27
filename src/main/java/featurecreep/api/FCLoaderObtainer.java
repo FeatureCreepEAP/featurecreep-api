@@ -18,7 +18,7 @@ public class FCLoaderObtainer {
 	 * @param clazz
 	 * @return
 	 */
-	public static @Nullable FCLoaderBasic getFCLoaderBasic(Class clazz) {
+	public static @Nullable FCLoaderBasic getFCLoaderBasic(Class<?> clazz) {
 		Module mod = Module.forClass(clazz);
 		if (mod != null) {
 			ModuleLoader loader = mod.getModuleLoader();
