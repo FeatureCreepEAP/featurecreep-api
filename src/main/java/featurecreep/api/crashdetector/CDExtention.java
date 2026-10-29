@@ -1,248 +1,157 @@
 package featurecreep.api.crashdetector;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.nio.charset.StandardCharsets;
-import java.util.Properties;
 
 import com.asbestosstar.crashdetector.Extencion;
 import com.asbestosstar.crashdetector.MonitorDePID;
-import com.asbestosstar.crashdetector.analizador.Analizador;
 
 import featurecreep.api.FCLoaderObtainer;
+import featurecreep.api.crashdetector.ipc.IntercomReader;
+import featurecreep.api.crashdetector.ipc.IntercomSession;
+import featurecreep.api.crashdetector.ipc.ResultRecord;
+import featurecreep.api.crashdetector.ipc.Ticket;
 import featurecreep.loader.eventviewer.EventListener;
 import featurecreep.loader.eventviewer.listeners.IncompatibleEventListenerMethodReference;
 
 /**
- * Extensión que: - En proceso de APP: limpia e inicializa la carpeta de
- * intercom y dispara listeners de registro. - En proceso de CrashDetector:
- * re-importa los tickets (.reg.properties) desde intercom/registry y los
- * inserta en el Analizador (vía CrashDetectorError.register).
+ * Game process: starts the intercom session and fires the AppError listeners.
+ * CrashDetector process: re-imports the tickets of the game's current session.
  */
 public class CDExtention implements Extencion {
 
 	@Override
 	public void procesoDeLaMonitorizacionDePID() {
-		// Estamos en el proceso de CrashDetector
 		CrashDetectorError.inCDProcess = true;
-
-		// Re-importar tickets previamente generados por el proceso del juego
 		reimportarRegistrosDesdeIntercom();
 	}
 
 	@Override
 	public void procesoDelApp() {
-		// Proceso del juego: limpiar/crear carpeta de intercom y disparar listeners
-		File carpetaDeIntercom = MonitorDePID.carpeta.resolve("featurecreep-intercom").toFile();
-		if (carpetaDeIntercom.exists() && carpetaDeIntercom.isDirectory()) {
-			deleteDirectoryContents(carpetaDeIntercom);
-		}
-		carpetaDeIntercom.mkdirs();
+		CrashDetectorError.escritorDelJuego();
 
 		for (EventListener listener : FCLoaderObtainer.getFCLoaderBasic(this.getClass()).getEventViewer()
 				.getListener(AppError.EVENT.getEvent_name())) {
 			try {
 				listener.invoke();
 			} catch (IncompatibleEventListenerMethodReference e) {
-				// No dejamos que un error aquí tumbe la inicialización
-				e.printStackTrace();
+				CrashDetectorError.aviso("listener de AppError incompatible", e);
 			}
 		}
 	}
 
-	// -----------------------------------------------------------
-	// Re-importación de tickets (sólo en proceso CrashDetector)
-	// -----------------------------------------------------------
-
-	private void reimportarRegistrosDesdeIntercom() {
-		File baseIntercom = MonitorDePID.carpeta.resolve("featurecreep-intercom").toFile();
-		File carpetaRegistry = new File(baseIntercom, "registry");
-		if (!carpetaRegistry.exists() || !carpetaRegistry.isDirectory()) {
-			return; // Nada que importar
-		}
-
-		File[] tickets = carpetaRegistry.listFiles((dir, name) -> name.endsWith(".reg.properties"));
-		if (tickets == null || tickets.length == 0) {
+	private static void reimportarRegistrosDesdeIntercom() {
+		IntercomReader lector = new IntercomReader(CrashDetectorError.carpetaDeIntercom());
+		IntercomReader.Resultado<IntercomSession> sesion = lector.leerSesion(MonitorDePID.pid);
+		if (sesion.valor().isEmpty()) {
+			sesion.problemas().forEach(p -> CrashDetectorError.aviso(p, null));
 			return;
 		}
 
-		for (File ticket : tickets) {
-			try {
-				Properties p = new Properties();
-				try (FileInputStream fis = new FileInputStream(ticket)) {
-					p.load(fis);
-				}
+		IntercomSession actual = sesion.valor().get();
+		IntercomReader.Lectura<Ticket> tickets = lector.leerTickets(actual);
+		tickets.problemas().forEach(p -> CrashDetectorError.aviso(p, null));
 
-				final String id = trimOrEmpty(p.getProperty("id"));
-				final String name = trimOrEmpty(p.getProperty("name"));
-				final String clazz = trimOrEmpty(p.getProperty("class"));
-				final String levelStr = trimOrEmpty(p.getProperty("level"));
-				final String prioStr = trimOrEmpty(p.getProperty("priority"));
-				final boolean dynamic = Boolean.parseBoolean(trimOrEmpty(p.getProperty("dynamic")));
-
-				// Intento de instanciación directa si no es dinámico
-				AppError appError = null;
-				if (!dynamic && !clazz.isEmpty()) {
-					appError = instanciarAppError(clazz);
-				}
-				// Si falló o es dinámico, usamos proxy
-				if (appError == null) {
-					appError = crearProxyDesdeTicket(baseIntercom, id, name, levelStr, prioStr);
-				}
-
-				// Registrar en Analizador (vía CrashDetectorError.register, que dentro de CD
-				// añade a Analizador.verificaciones)
-				CrashDetectorError envoltura = new CrashDetectorError(appError);
-				// CrashDetectorError.register(envoltura, dynamic);
-				MonitorDePID.analizador.verificaciones.add(envoltura);
-			} catch (Throwable t) {
-				// Tolerante a fallos: un ticket corrupto no debe detener la importación
-				// (intencionalmente silencioso o logueable si se dispone de logger)
+		for (Ticket ticket : tickets.validos()) {
+			AppError app = ticket.dynamic() ? null : instanciarAppError(ticket);
+			if (app == null) {
+				app = new ProxyDesdeIntercom(ticket, lector, actual);
 			}
+			CrashDetectorError.register(new CrashDetectorError(app), ticket.dynamic());
 		}
 	}
 
-	/**
-	 * Intenta cargar e instanciar una clase AppError por reflexión. Soporta
-	 * constructores sin args.
-	 */
-	private AppError instanciarAppError(String fqn) {
+	private static AppError instanciarAppError(Ticket ticket) {
 		try {
-			Class<?> c = Class.forName(fqn);
-			if (!AppError.class.isAssignableFrom(c)) {
+			Class<?> clase = Class.forName(ticket.className());
+			if (!AppError.class.isAssignableFrom(clase)) {
+				CrashDetectorError.aviso(ticket.className() + " no implementa AppError; se usa proxy", null);
 				return null;
 			}
-			@SuppressWarnings("unchecked")
-			Class<? extends AppError> ce = (Class<? extends AppError>) c;
-			Constructor<? extends AppError> ctor = ce.getDeclaredConstructor();
+			Constructor<? extends AppError> ctor = clase.asSubclass(AppError.class).getDeclaredConstructor();
 			ctor.setAccessible(true);
 			return ctor.newInstance();
-		} catch (Throwable t) {
+		} catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+			CrashDetectorError.aviso("no se pudo instanciar " + ticket.className() + "; se usa proxy", e);
 			return null;
 		}
 	}
 
 	/**
-	 * Crea un AppError proxy basado en los metadatos del ticket y ficheros
-	 * opcionales de resultados en intercom/results/<id>/: - message.txt ->
-	 * contenido del mensaje - triggered.flag -> si existe, se considera true
+	 * Stands in for an error CrashDetector cannot instantiate. Its triggered state
+	 * and message come only from the result the game published.
 	 */
-	private AppError crearProxyDesdeTicket(File baseIntercom, String id, String name, String levelStr, String prioStr) {
-		final File resultsDir = new File(new File(baseIntercom, "results"), idSafe(id));
-		final File msgFile = new File(resultsDir, "message.txt");
-		final File trigFile = new File(resultsDir, "triggered.flag");
+	private static final class ProxyDesdeIntercom implements AppError {
 
-		final String msg = leerArchivoComoString(msgFile);
-		final boolean triggered = trigFile.isFile();
+		private final Ticket ticket;
+		private final IntercomReader lector;
+		private final IntercomSession sesion;
+		private final AppError.ErrorLevel nivel;
 
-		final AppError.ErrorLevel level = parseLevel(levelStr);
-		final double prio = parseDoubleOrDefault(prioStr, 0.0);
-
-		return new AppError() {
-			@Override
-			public void parse(String logname, String log) {
-				/* no-op en proxy */ }
-
-			@Override
-			public String name() {
-				return name.isEmpty() ? id : name;
-			}
-
-			@Override
-			public String id() {
-				return id;
-			}
-
-			@Override
-			public boolean triggered() {
-				return triggered;
-			}
-
-			@Override
-			public double priority() {
-				return prio;
-			}
-
-			@Override
-			public String message() {
-				return (msg == null || msg.isEmpty()) ? name() : msg;
-			}
-
-			@Override
-			public boolean matchesTrace(String trace) {
-				return false;
-			} // sin matching en proxy
-
-			@Override
-			public ErrorLevel errorLevel() {
-				return level;
-			}
-
-			@Override
-			public AppError newInstance() {
-				return this;
-			} // proxy es inmutable/simple
-		};
-	}
-
-	private String leerArchivoComoString(File f) {
-		if (f == null || !f.isFile())
-			return null;
-		StringBuilder sb = new StringBuilder();
-		try (BufferedReader br = new BufferedReader(new FileReader(f, StandardCharsets.UTF_8))) {
-			String line;
-			while ((line = br.readLine()) != null) {
-				sb.append(line).append('\n');
-			}
-		} catch (IOException ignored) {
+		ProxyDesdeIntercom(Ticket ticket, IntercomReader lector, IntercomSession sesion) {
+			this.ticket = ticket;
+			this.lector = lector;
+			this.sesion = sesion;
+			this.nivel = parseNivel(ticket);
 		}
-		return sb.toString().trim();
-	}
 
-	private AppError.ErrorLevel parseLevel(String s) {
-		if (s == null)
-			return AppError.ErrorLevel.ERROR;
-		try {
-			return AppError.ErrorLevel.valueOf(s.trim().toUpperCase());
-		} catch (IllegalArgumentException ex) {
-			return AppError.ErrorLevel.ERROR;
+		@Override
+		public void parse(String logname, String log) {
+			// Los resultados los publica el proceso del juego, no el analisis de logs.
 		}
-	}
 
-	private double parseDoubleOrDefault(String s, double dflt) {
-		try {
-			return Double.parseDouble(s.trim());
-		} catch (Exception e) {
-			return dflt;
+		@Override
+		public String name() {
+			return ticket.name().isEmpty() ? ticket.id() : ticket.name();
 		}
-	}
 
-	private String trimOrEmpty(String s) {
-		return s == null ? "" : s.trim();
-	}
+		@Override
+		public String id() {
+			return ticket.id();
+		}
 
-	private String idSafe(String s) {
-		if (s == null || s.isEmpty())
-			return "sin_id";
-		return s.replaceAll("[^A-Za-z0-9._-]", "_");
-	}
+		@Override
+		public boolean triggered() {
+			IntercomReader.Resultado<ResultRecord> r = leer();
+			r.problemas().forEach(p -> CrashDetectorError.aviso(p, null));
+			return r.valor().map(ResultRecord::triggered).orElse(false);
+		}
 
-	// -----------------------------------------------------------
-	// Utilidades
-	// -----------------------------------------------------------
+		@Override
+		public double priority() {
+			return ticket.priority();
+		}
 
-	private void deleteDirectoryContents(File directory) {
-		File[] files = directory.listFiles();
-		if (files != null) {
-			for (File file : files) {
-				if (file.isDirectory()) {
-					deleteDirectoryContents(file);
-				}
-				file.delete();
+		@Override
+		public String message() {
+			return leer().valor().map(ResultRecord::message).orElse("");
+		}
+
+		@Override
+		public boolean matchesTrace(String trace) {
+			return false;
+		}
+
+		@Override
+		public ErrorLevel errorLevel() {
+			return nivel;
+		}
+
+		@Override
+		public AppError newInstance() {
+			return this;
+		}
+
+		private IntercomReader.Resultado<ResultRecord> leer() {
+			return lector.leerResultado(ticket.id(), sesion);
+		}
+
+		private static AppError.ErrorLevel parseNivel(Ticket ticket) {
+			try {
+				return AppError.ErrorLevel.valueOf(ticket.level());
+			} catch (IllegalArgumentException e) {
+				CrashDetectorError.aviso("nivel desconocido '" + ticket.level() + "' en " + ticket.id()
+						+ "; se usa ERROR", e);
+				return AppError.ErrorLevel.ERROR;
 			}
 		}
 	}

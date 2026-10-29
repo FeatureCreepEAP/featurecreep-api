@@ -1,65 +1,152 @@
 package featurecreep.api.crashdetector;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
-import java.util.Properties;
+import java.io.IOException;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.asbestosstar.crashdetector.Consola;
-import com.asbestosstar.crashdetector.MonitorDePID;
-import com.asbestosstar.crashdetector.analizador.QuickFix;
-import com.asbestosstar.crashdetector.analizador.VerificacionDeStackTrace.TraceInfo;
-import com.asbestosstar.crashdetector.analizador.Verificaciones;
+import com.asbestosstar.crashdetector.Statics;
 import com.asbestosstar.crashdetector.analizador.Analizador;
+import com.asbestosstar.crashdetector.analizador.Criticalidad;
+import com.asbestosstar.crashdetector.analizador.QuickFix;
+import com.asbestosstar.crashdetector.analizador.Verificaciones;
+import com.asbestosstar.crashdetector.analizador.rapido.EstadoAnalisisArchivo;
+import com.asbestosstar.crashdetector.analizador.rapido.EventoDeCoincidencia;
+import com.asbestosstar.crashdetector.gui.tipos.docs.Documento;
+
+import featurecreep.api.crashdetector.ipc.IntercomLayout;
+import featurecreep.api.crashdetector.ipc.IntercomSession;
+import featurecreep.api.crashdetector.ipc.IntercomWriter;
+import featurecreep.api.crashdetector.ipc.ResultRecord;
+import featurecreep.api.crashdetector.ipc.Ticket;
 
 /**
- * Envoltura para adaptar AppError a Verificaciones de CrashDetector. NOTA:
- * CrashDetector puede correr en un proceso separado. Por ello, el registro de
- * errores contempla dos rutas:
+ * Adapts an AppError to CrashDetector's Verificaciones.
  *
- * 1) Proceso CrashDetector (inCDProcess=true): - Se puede registrar
- * directamente el Verificaciones en Analizador.verificaciones.
+ * CrashDetector may run in another process. Registration has two paths:
  *
- * 2) Proceso del juego (inCDProcess=false): - No se puede acceder al Analizador
- * directamente. Se deja un "ticket" en la carpeta de intercom
- * (featurecreep-intercom/registry) con metadatos (id, clase, dynamic, etc.)
- * para que CrashDetector los re-importe durante su arranque (p. ej. en
- * CDExtention.procesoDelApp()).
+ * 1) CrashDetector process (inCDProcess=true): the wrapper is added to
+ * Analizador.verificaciones, the only registration path.
  *
- * Para errores "dynamic" se recomienda hacer la mayor parte del parse en el
- * proceso del juego y escribir resultados en archivos propios de intercom.
+ * 2) Game process: a Ticket is published in the intercom so CrashDetector can
+ * re-create the error in CDExtention. Results are published with
+ * publicarResultado, and CrashDetector reads them lazily.
+ *
+ * A wrapper is triggered only when a log analysis triggered it.
  */
 public class CrashDetectorError implements Verificaciones {
 
-	public static boolean inCDProcess = false;
+	public static volatile boolean inCDProcess = false;
 
-	AppError error;
+	private static volatile Juego juego;
+
+	private final AppError error;
+	private final List<AppError> disparos = new CopyOnWriteArrayList<>();
+
+	public CrashDetectorError(AppError error) {
+		this.error = Objects.requireNonNull(error, "error");
+	}
 
 	/**
-	 * Constructor interno que envuelve un AppError.
+	 * Game process: starts a new intercom session for this run and removes the
+	 * records of earlier runs.
 	 */
-	public CrashDetectorError(AppError error) {
-		this.error = error;
+	public static synchronized void escritorDelJuego() {
+		try {
+			IntercomLayout layout = carpetaDeIntercom();
+			IntercomSession sesion = IntercomSession.crear(ProcessHandle.current().pid());
+			IntercomWriter.limpiarSesionesAnteriores(layout);
+			IntercomWriter escritor = new IntercomWriter(layout, sesion);
+			escritor.escribirSesion();
+			juego = new Juego(sesion, escritor);
+		} catch (IOException | RuntimeException e) {
+			juego = null;
+			aviso("no se pudo iniciar el intercom de CrashDetector", e);
+		}
 	}
 
-	@Override
-	public boolean activado() {
-		return error.triggered();
+	/**
+	 * Registers the error for CrashDetector, either directly in the CrashDetector
+	 * process or as a ticket in the game process.
+	 *
+	 * @param envoltura wrapper to register
+	 * @param dynamic   true if the error depends on game classes or is generated at
+	 *                  runtime, so CrashDetector must not instantiate it
+	 */
+	public static void register(CrashDetectorError envoltura, boolean dynamic) {
+		if (inCDProcess) {
+			registrarEnAnalizador(envoltura);
+		} else {
+			publicarTicket(envoltura.error, dynamic);
+		}
 	}
 
-	@Override
-	public String id() {
-		return error.id();
+	/**
+	 * Game process: publishes the current result of an error for CrashDetector.
+	 */
+	public static void publicarResultado(AppError error) {
+		Juego actual = juego;
+		if (actual == null) {
+			aviso("resultado sin intercom iniciado: " + error.id(), null);
+			return;
+		}
+		try {
+			actual.escritor().publicarResultado(new ResultRecord(
+					error.id(),
+					error.triggered(),
+					Objects.toString(error.message(), ""),
+					error.errorLevel().name(),
+					error.priority(),
+					actual.sesion().pid(),
+					actual.sesion().nonce()));
+		} catch (IOException | RuntimeException e) {
+			aviso("no se pudo publicar el resultado de " + error.id(), e);
+		}
 	}
 
-	@Override
-	public String mensaje() {
-		return error.message();
+	static IntercomLayout carpetaDeIntercom() {
+		return new IntercomLayout(Statics.carpeta.resolve(IntercomLayout.CARPETA));
 	}
 
-	@Override
-	public String nombre() {
-		return error.name();
+	static void aviso(String mensaje, Throwable causa) {
+		System.err.println("[featurecreep-crashdetector] " + mensaje);
+		if (causa != null) {
+			causa.printStackTrace();
+		}
+	}
+
+	private static void registrarEnAnalizador(CrashDetectorError envoltura) {
+		synchronized (Analizador.verificaciones) {
+			boolean repetida = Analizador.verificaciones.stream()
+					.anyMatch(v -> v.id().equals(envoltura.id()));
+			if (repetida) {
+				aviso("verificacion repetida ignorada: " + envoltura.id(), null);
+				return;
+			}
+			Analizador.verificaciones.add(envoltura);
+		}
+	}
+
+	private static void publicarTicket(AppError error, boolean dynamic) {
+		Juego actual = juego;
+		if (actual == null) {
+			aviso("registro sin intercom iniciado: " + error.id(), null);
+			return;
+		}
+		try {
+			actual.escritor().publicarTicket(new Ticket(
+					error.id(),
+					error.name(),
+					error.getClass().getName(),
+					dynamic,
+					error.priority(),
+					error.errorLevel().name(),
+					actual.sesion().pid(),
+					actual.sesion().nonce()));
+		} catch (IOException | RuntimeException e) {
+			aviso("no se pudo publicar el ticket de " + error.id(), e);
+		}
 	}
 
 	@Override
@@ -68,8 +155,23 @@ public class CrashDetectorError implements Verificaciones {
 	}
 
 	@Override
-	public boolean ocupaTrazo(TraceInfo info) {
-		return error.matchesTrace(info.trace);
+	public boolean activado() {
+		return !disparos.isEmpty();
+	}
+
+	@Override
+	public String mensaje() {
+		return disparos.isEmpty() ? "" : Objects.toString(disparos.get(0).message(), "");
+	}
+
+	@Override
+	public String id() {
+		return error.id();
+	}
+
+	@Override
+	public String nombre() {
+		return error.name();
 	}
 
 	@Override
@@ -79,102 +181,45 @@ public class CrashDetectorError implements Verificaciones {
 
 	@Override
 	public QuickFix solucion() {
-		return new QuickFix.Builder(nombre()).agregarEtiqueta(MonitorDePID.idioma.noHaySolucionDisponible())
-				.construir();
+		return QuickFix.NINGUN;
 	}
 
 	@Override
-	public void verificar(Consola consola) {
-		// Delegamos el parseo del log al AppError envuelto.
-		error.parse(consola.archivo.toString(), consola.contenido_verificar);
+	public Documento docs() {
+		return Documento.NINGUN;
 	}
 
-	/**
-	 * Registra el error para CrashDetector, considerando si estamos en el proceso
-	 * de CrashDetector (registro directo) o en el proceso del juego (ticket en
-	 * intercom).
-	 *
-	 * @param envoltura instancia ya envuelta (CrashDetectorError)
-	 * @param dynamic   true si el AppError depende de clases/recursos del juego o
-	 *                  se genera dinámicamente (nested jars, generación en
-	 *                  runtime); false si es estático y el .class es accesible para
-	 *                  CrashDetector.
-	 */
-	public static void register(CrashDetectorError envoltura, boolean dynamic) {
-		if (envoltura == null || envoltura.error == null) {
-			return;
-		}
-
-		if (inCDProcess) {
-			// --- Ruta 1: estamos dentro del proceso de CrashDetector ---
-			// Podemos registrar directamente la verificación para que el Analizador la
-			// ejecute.
-			try {
-				Analizador.verificaciones.add(envoltura);
-			} catch (Throwable t) {
-				// Evitar que un fallo aquí tumbe el arranque del analizador.
-				// (intencionalmente sin re-lanzar)
-			}
-			return;
-		}
-
-		// --- Ruta 2: estamos en el proceso del juego ---
-		// Escribimos un ticket/entrada de registro en la carpeta de intercom para que
-		// CrashDetector pueda re-importarlo. No asumimos que CrashDetector pueda
-		// cargar clases del juego si dynamic=true.
-
-		try {
-			// Carpeta base de intercom (creada/limpiada en CDExtention.procesoDelApp()).
-			final File baseIntercom = MonitorDePID.carpeta.resolve("featurecreep-intercom").toFile();
-			final File carpetaRegistry = new File(baseIntercom, "registry");
-			if (!carpetaRegistry.exists()) {
-				carpetaRegistry.mkdirs();
-			}
-
-			// Usamos el id como nombre de archivo, saneado a caracteres seguros.
-			final String idSeguro = sanitizarNombreArchivo(envoltura.id());
-			final File archivoTicket = new File(carpetaRegistry, idSeguro + ".reg.properties");
-
-			// Guardamos propiedades mínimas para la re-importación.
-			final Properties props = new Properties();
-			props.setProperty("id", safe(envoltura.id()));
-			props.setProperty("name", safe(envoltura.nombre()));
-			props.setProperty("class", safe(envoltura.error.getClass().getName()));
-			props.setProperty("dynamic", Boolean.toString(dynamic));
-			// Metadatos opcionales útiles para ordenado/visual:
-			props.setProperty("priority", Double.toString(envoltura.error.priority()));
-			props.setProperty("level", envoltura.error.errorLevel().name());
-
-			// NOTA sobre dynamic:
-			// - dynamic=true: CrashDetector NO debe intentar instanciar la clase del juego.
-			// En su lugar, un importador del lado CrashDetector puede crear un proxy
-			// (p. ej. otra CrashDetectorError vacía) que sólo lee resultados pre-procesados
-			// desde featurecreep-intercom (p. ej. /results/<id>.json) escritos por el
-			// juego.
-			// - dynamic=false: CrashDetector puede intentar cargar/reflejar la clase
-			// indicada
-			// si el classpath compartido lo permite. Si no, al menos tendrá el id/nombre
-			// para mostrar algo o pedir al usuario los resultados generados.
-
-			try (OutputStream os = new FileOutputStream(archivoTicket)) {
-				props.store(os, "Registro de AppError para CrashDetector (dynamic=" + dynamic + ")");
-			}
-		} catch (Throwable t) {
-			// Silencioso: el registro no debe romper el juego si la carpeta no existe, etc.
+	@Override
+	public Criticalidad nivel_de_criticalidad() {
+		switch (error.errorLevel()) {
+		case FATAL:
+			return Criticalidad.FATAL;
+		case WARNING:
+			return Criticalidad.ADVERTENCIA;
+		default:
+			return Criticalidad.ERROR;
 		}
 	}
 
-	private static String safe(String s) {
-		return s == null ? "" : s;
+	@Override
+	public String[] patronesRapidos() {
+		return new String[0];
 	}
 
-	/**
-	 * Sanea un nombre para archivo simple (ASCII seguro).
-	 */
-	private static String sanitizarNombreArchivo(String nombre) {
-		if (nombre == null || nombre.isEmpty())
-			return "sin_id";
-		// Reemplazar todo lo que no sea [A-Za-z0-9._-] por '_'
-		return nombre.replaceAll("[^A-Za-z0-9._-]", "_");
+	@Override
+	public void verificarCoincidencia(EventoDeCoincidencia evento) {
+		// El analisis se hace por archivo en finalizarArchivo, no por coincidencias rapidas.
+	}
+
+	@Override
+	public void finalizarArchivo(Consola consola, EstadoAnalisisArchivo estado) {
+		AppError analisis = error.newInstance();
+		analisis.parse(String.valueOf(consola.archivo), Objects.toString(consola.contenido_verificar, ""));
+		if (analisis.triggered()) {
+			disparos.add(analisis);
+		}
+	}
+
+	private record Juego(IntercomSession sesion, IntercomWriter escritor) {
 	}
 }

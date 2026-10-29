@@ -1,7 +1,8 @@
 package featurecreep.api.crashdetector;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import featurecreep.loader.eventviewer.EventViewerEvent;
 import featurecreep.loader.eventviewer.events.BasicEvent;
@@ -26,25 +27,35 @@ public interface AppError {
 	 * USE registerError(Error) method instead. This is where the errors are
 	 * registered
 	 */
-	static List<AppError> errors = new ArrayList<AppError>();
+	static final List<AppError> errors = new CopyOnWriteArrayList<AppError>();
 
 	/**
 	 * Register your errors here.
-	 * 
+	 *
 	 * @param error
 	 * @param dynamic This option is for Crash Detector if your class is made
 	 *                dynamically, or is in a nested jar, or is relying on info in
 	 *                the game classes and needs to be serialised (true) or if it is
 	 *                just a static log analysis with a physical class file not in a
-	 *                nested jar¡.
+	 *                nested jar.
 	 */
 	public static void registerError(AppError error, boolean dynamic) {
+		Objects.requireNonNull(error, "error");
 		errors.add(error);
-		if (AppError.classExists("com.asbestosstar.crashdetector.analizador.Verificaciones")) {
-			CrashDetectorError cd = new CrashDetectorError(error);
-			CrashDetectorError.register(cd, dynamic);
+		if (crashDetectorPresente()) {
+			CrashDetectorError.register(new CrashDetectorError(error), dynamic);
 		}
+	}
 
+	/**
+	 * Publishes the current triggered state and message of this error for
+	 * CrashDetector. Call it in the game process once the result is known; for
+	 * dynamic errors CrashDetector reads only what was published here.
+	 */
+	public default void publicarResultado() {
+		if (crashDetectorPresente()) {
+			CrashDetectorError.publicarResultado(this);
+		}
 	}
 
 	/**
@@ -52,7 +63,7 @@ public interface AppError {
 	 * information about the message. on CrashDetector this is often called on a
 	 * seperate process so in the game process you should store info in a file if
 	 * you need to intercommunicate
-	 * 
+	 *
 	 * @param logname
 	 * @param log
 	 */
@@ -65,14 +76,14 @@ public interface AppError {
 
 	/**
 	 * An ID for the error, should be all ASCII with no special chars
-	 * 
+	 *
 	 * @return
 	 */
 	public String id();
 
 	/**
 	 * If the error has been triggered in parse
-	 * 
+	 *
 	 * @return
 	 */
 	public boolean triggered();
@@ -80,23 +91,23 @@ public interface AppError {
 	/**
 	 * Priority. CrashDetector has an unenforced high end of about 1000 with some
 	 * going higher or lower
-	 * 
+	 *
 	 * @return
 	 */
 	public double priority();
 
 	/**
 	 * The message to write in the results
-	 * 
+	 *
 	 * @return
 	 */
 	public String message();
 
 	/**
-	 * For crash detection mods with ocupied stacktrace registries like
-	 * CrashDetector, you can write if a stacktrace matches with one from the
-	 * Stacktrace analyser
-	 * 
+	 * Matches a stacktrace for implementations that analyse traces themselves.
+	 * CrashDetector does not call this method: its trace filter only accepts
+	 * literal patterns, so traces are not matched through this interface.
+	 *
 	 * @param trace
 	 * @return
 	 */
@@ -104,14 +115,15 @@ public interface AppError {
 
 	/**
 	 * The level of error, Fatal, Error, or Warning
-	 * 
+	 *
 	 * @return
 	 */
 	public ErrorLevel errorLevel();
 
 	/**
-	 * A new instance of the current error
-	 * 
+	 * A fresh instance of this error with no state from earlier parse calls. The
+	 * analysis of each log file runs on its own instance.
+	 *
 	 * @return
 	 */
 	public AppError newInstance();
@@ -125,7 +137,7 @@ public interface AppError {
 
 	/**
 	 * Checks if a class exists
-	 * 
+	 *
 	 * @param name
 	 * @return
 	 */
@@ -134,10 +146,12 @@ public interface AppError {
 			Class.forName(name);
 			return true;
 		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			// e.printStackTrace();
 			return false;
 		}
+	}
+
+	private static boolean crashDetectorPresente() {
+		return classExists("com.asbestosstar.crashdetector.analizador.Verificaciones");
 	}
 
 }
